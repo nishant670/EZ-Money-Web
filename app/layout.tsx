@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "AI-powered personal finance app. Track expenses & income instantly with voice-first AI.",
 };
 
+import { AuthProvider } from "./context/AuthContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,7 +29,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${manrope.variable} antialiased font-sans`}
       >
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
 import {
     TrendingUp,
@@ -9,9 +9,8 @@ import {
     AlertCircle,
     Plus,
     ArrowUpRight,
-    ArrowDownLeft,
-    Search,
-    CheckCircle2
+    CheckCircle2,
+    Info
 } from "lucide-react";
 import {
     AreaChart,
@@ -28,34 +27,103 @@ import {
 import { cn } from "@/app/lib/utils";
 import AddTransactionModal from "@/app/components/dashboard/AddTransactionModal";
 import TransactionDetailsDrawer from "@/app/components/dashboard/TransactionDetailsDrawer";
+import { EntriesAPI, Transaction } from "@/app/lib/api";
 
-const TREND_DATA = [
-    { name: "01 Jan", income: 4500, expense: 2100 },
-    { name: "05 Jan", income: 5200, expense: 3400 },
-    { name: "10 Jan", income: 4800, expense: 2800 },
-    { name: "15 Jan", income: 6100, expense: 4100 },
-    { name: "20 Jan", income: 5500, expense: 3200 },
-    { name: "25 Jan", income: 6700, expense: 3800 },
-    { name: "31 Jan", income: 7200, expense: 4500 },
-];
-
-const CATEGORY_DATA = [
-    { name: "Food", value: 4500, color: "#FF8865" },
-    { name: "Transport", value: 2100, color: "#FFB09C" },
-    { name: "Shopping", value: 3400, color: "#FFE8E5" },
-    { name: "Bills", value: 5800, color: "#2D2D2D" },
-    { name: "Others", value: 1200, color: "#F0E5E7" },
-];
+const COLORS = ["#FF8865", "#FFB09C", "#FFE8E5", "#2D2D2D", "#F0E5E7"];
 
 export default function DashboardHome() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedTxn, setSelectedTxn] = useState<any>(null);
 
-    const openDrawer = (txn: any) => {
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Derived State
+    const [summary, setSummary] = useState({
+        income: 0,
+        expense: 0,
+        savings: 0
+    });
+    const [chartData, setChartData] = useState<{ name: string, income: number, expense: number }[]>([]);
+    const [categoryData, setCategoryData] = useState<{ name: string, value: number, color: string }[]>([]);
+    const [reviewItems, setReviewItems] = useState<Transaction[]>([]);
+
+    useEffect(() => {
+        fetchData();
+    }, [isModalOpen, isDrawerOpen]); // Refresh when modal/drawer closes (naive invalidation)
+
+    const fetchData = async () => {
+        try {
+            const res = await EntriesAPI.list();
+            const txns = res.data;
+            setTransactions(txns);
+            processData(txns);
+        } catch (err) {
+            console.error("Failed to fetch dashboard data", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const processData = (txns: Transaction[]) => {
+        // 1. Summary
+        let inc = 0, exp = 0;
+        txns.forEach(t => {
+            if (t.type === 'income') inc += t.amount;
+            if (t.type === 'expense') exp += t.amount;
+        });
+        setSummary({ income: inc, expense: exp, savings: inc - exp });
+
+        // 2. Chart Data (Group by Date - Last 7 unique dates or last 7 days)
+        // Simple aggregation by date string
+        const daysMap = new Map<string, { income: number, expense: number }>();
+        txns.forEach(t => {
+            // Parse date to "DD MMM"
+            const dateObj = new Date(t.date);
+            const key = dateObj.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+
+            if (!daysMap.has(key)) daysMap.set(key, { income: 0, expense: 0 });
+            const curr = daysMap.get(key)!;
+            if (t.type === 'income') curr.income += t.amount;
+            if (t.type === 'expense') curr.expense += t.amount;
+        });
+        // Sort and take top 7
+        const chart = Array.from(daysMap.entries())
+            .map(([name, val]) => ({ name, ...val }))
+            .slice(-7)
+            .reverse();
+        setChartData(chart);
+
+        // 3. Category Data
+        const catMap = new Map<string, number>();
+        txns.filter(t => t.type === 'expense').forEach(t => {
+            catMap.set(t.category, (catMap.get(t.category) || 0) + t.amount);
+        });
+        const cat = Array.from(catMap.entries())
+            .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+        setCategoryData(cat);
+
+        // 4. Review Items (Pending status)
+        setReviewItems(txns.filter(t => t.status === "pending").slice(0, 3));
+    };
+
+    const openDrawer = (txn: Transaction) => {
         setSelectedTxn(txn);
         setIsDrawerOpen(true);
     };
+
+    if (isLoading) {
+        return (
+            <DashboardLayout>
+                <div className="flex h-[80vh] items-center justify-center">
+                    <div className="animate-pulse text-zinc-300 font-bold text-xl">Loading your finances...</div>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     return (
         <DashboardLayout>
@@ -78,9 +146,9 @@ export default function DashboardHome() {
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {[
-                        { label: "Total Spent", amount: "₹45,200", trend: "+12.5%", icon: TrendingUp, color: "text-red-500", bg: "bg-red-500/10" },
-                        { label: "Total Income", amount: "₹72,400", trend: "+5.2%", icon: TrendingDown, color: "text-green-500", bg: "bg-green-500/10" },
-                        { label: "Net Savings", amount: "₹27,200", trend: "-2.1%", icon: Wallet, color: "text-accent", bg: "bg-accent/10" },
+                        { label: "Total Spent", amount: `₹${summary.expense.toLocaleString()}`, trend: "This Month", icon: TrendingUp, color: "text-red-500", bg: "bg-red-500/10" },
+                        { label: "Total Income", amount: `₹${summary.income.toLocaleString()}`, trend: "This Month", icon: TrendingDown, color: "text-green-500", bg: "bg-green-500/10" },
+                        { label: "Net Savings", amount: `₹${summary.savings.toLocaleString()}`, trend: "This Month", icon: Wallet, color: "text-accent", bg: "bg-accent/10" },
                     ].map((card, i) => (
                         <div key={i} className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-border shadow-sm hover:shadow-xl transition-all group">
                             <div className="flex justify-between items-start mb-6">
@@ -104,12 +172,12 @@ export default function DashboardHome() {
                         <div className="flex items-center justify-between mb-8">
                             <h3 className="text-xl font-bold font-rounded">Spending Trends</h3>
                             <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-zinc-400 underline decoration-2 underline-offset-4 decoration-accent/20">
-                                Last 30 Days
+                                Last 7 Days
                             </div>
                         </div>
                         <div className="h-[350px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={TREND_DATA}>
+                                <AreaChart data={chartData}>
                                     <defs>
                                         <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#FF8865" stopOpacity={0.1} />
@@ -141,40 +209,46 @@ export default function DashboardHome() {
 
                     {/* Category Breakdown */}
                     <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-border shadow-sm flex flex-col">
-                        <h3 className="text-xl font-bold font-rounded mb-8">Categories</h3>
-                        <div className="h-[250px] w-full relative">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={CATEGORY_DATA}
-                                        innerRadius={80}
-                                        outerRadius={100}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {CATEGORY_DATA.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip />
-                                </PieChart>
-                            </ResponsiveContainer>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <p className="text-xs font-bold text-zinc-400">Total Spent</p>
-                                <p className="text-2xl font-bold font-rounded">₹18,200</p>
-                            </div>
-                        </div>
-                        <div className="mt-8 space-y-3 flex-1 overflow-y-auto pr-2">
-                            {CATEGORY_DATA.map((item, i) => (
-                                <div key={i} className="flex items-center justify-between group cursor-pointer">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                                        <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 transition-colors">{item.name}</span>
+                        <h3 className="text-xl font-bold font-rounded mb-8">Top Categories</h3>
+                        {categoryData.length > 0 ? (
+                            <>
+                                <div className="h-[250px] w-full relative">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={categoryData}
+                                                innerRadius={80}
+                                                outerRadius={100}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {categoryData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <p className="text-xs font-bold text-zinc-400">Expenses</p>
+                                        <p className="text-2xl font-bold font-rounded">₹{summary.expense.toLocaleString()}</p>
                                     </div>
-                                    <span className="text-sm font-bold">₹{item.value.toLocaleString()}</span>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="mt-8 space-y-3 flex-1 overflow-y-auto pr-2">
+                                    {categoryData.map((item, i) => (
+                                        <div key={i} className="flex items-center justify-between group cursor-pointer">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                                                <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 transition-colors">{item.name}</span>
+                                            </div>
+                                            <span className="text-sm font-bold">₹{item.value.toLocaleString()}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex items-center justify-center text-zinc-400 text-sm">No expense data</div>
+                        )}
                     </div>
                 </div>
 
@@ -185,35 +259,35 @@ export default function DashboardHome() {
                         <div className="flex items-center justify-between mb-8">
                             <div className="flex items-center gap-3">
                                 <h3 className="text-xl font-bold font-rounded">Review Required</h3>
-                                <span className="bg-accent/10 text-accent text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">3 Items</span>
+                                <span className="bg-accent/10 text-accent text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">{reviewItems.length} Items</span>
                             </div>
                             <button className="text-xs font-bold text-accent hover:underline">View All</button>
                         </div>
 
-                        <div className="space-y-4">
-                            {[
-                                { title: "Missing Category", desc: "Transaction at Starbucks (₹350)", icon: AlertCircle, color: "text-amber-500", bg: "bg-amber-500/10" },
-                                { title: "Possible Duplicate", desc: "₹1,200 found twice on 12 Jan", icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10" },
-                                { title: "Uncategorized AI", desc: "Extraction needs verification (₹4,500)", icon: AlertCircle, color: "text-blue-500", bg: "bg-blue-500/10" },
-                            ].map((item, i) => (
-                                <div
-                                    key={i}
-                                    onClick={() => openDrawer({ merchant: item.title, cat: "AI Review", amount: "₹0", date: "System Alert", account: "N/A", tags: ["Review"] })}
-                                    className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl group hover:bg-white border border-transparent hover:border-border transition-all cursor-pointer"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", item.bg, item.color)}>
-                                            <item.icon className="w-5 h-5" />
+                        {reviewItems.length > 0 ? (
+                            <div className="space-y-4">
+                                {reviewItems.map((item, i) => (
+                                    <div
+                                        key={item.ID}
+                                        onClick={() => openDrawer(item)}
+                                        className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl group hover:bg-white border border-transparent hover:border-border transition-all cursor-pointer"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-500">
+                                                <AlertCircle className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold group-hover:text-accent transition-colors">{item.merchant || "Unknown Merchant"}</p>
+                                                <p className="text-xs text-zinc-500">{item.title || "Review Needed"}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold group-hover:text-accent transition-colors">{item.title}</p>
-                                            <p className="text-xs text-zinc-500">{item.desc}</p>
-                                        </div>
+                                        <ArrowUpRight className="w-4 h-4 text-zinc-300 group-hover:text-accent group-hover:translate-x-1 group-hover:-translate-y-1 transition-all" />
                                     </div>
-                                    <ArrowUpRight className="w-4 h-4 text-zinc-300 group-hover:text-accent group-hover:translate-x-1 group-hover:-translate-y-1 transition-all" />
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-10 text-center text-zinc-400 text-sm">All caught up! No reviews pending.</div>
+                        )}
                     </div>
 
                     {/* Recent Transactions */}
@@ -224,39 +298,42 @@ export default function DashboardHome() {
                         </div>
 
                         <div className="space-y-6">
-                            {[
-                                { merchant: "Zomato", cat: "Food", amount: "-₹540", date: "Today, 2:30 PM", status: "confirmed" },
-                                { merchant: "Salary Credit", cat: "Income", amount: "+₹85,000", date: "Yesterday", status: "confirmed" },
-                                { merchant: "Apple Store", cat: "Electronics", amount: "-₹1,200", date: "14 Jan, 2026", status: "pending" },
-                                { merchant: "Uber India", cat: "Transport", amount: "-₹210", date: "12 Jan, 2026", status: "confirmed" },
-                            ].map((t, i) => (
+                            {transactions.slice(0, 5).map((t, i) => (
                                 <div
-                                    key={i}
-                                    onClick={() => openDrawer({ merchant: t.merchant, cat: t.cat, amount: t.amount, date: t.date, account: "ICICI Bank", tags: ["Recent"] })}
+                                    key={t.ID}
+                                    onClick={() => openDrawer(t)}
                                     className="flex items-center justify-between group cursor-pointer"
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center font-bold text-zinc-400 group-hover:text-accent group-hover:bg-accent/10 transition-all shadow-sm">
-                                            {t.merchant[0]}
+                                            {t.merchant ? t.merchant[0] : (t.title ? t.title[0] : '?')}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-bold dark:text-white">{t.merchant}</p>
-                                            <p className="text-xs text-zinc-500 font-medium">{t.cat} • {t.date}</p>
+                                            <p className="text-sm font-bold dark:text-white">{t.merchant || t.title}</p>
+                                            <p className="text-xs text-zinc-500 font-medium">{t.category} • {t.date}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className={cn("text-sm font-bold", t.amount.startsWith("+") ? "text-green-500" : "text-zinc-900 dark:text-white")}>{t.amount}</p>
+                                        <p className={cn("text-sm font-bold", t.type === 'income' ? "text-green-500" : "text-zinc-900 dark:text-white")}>
+                                            {t.type === 'income' ? '+' : '-'}₹{t.amount}
+                                        </p>
                                         {t.status === "confirmed" ? (
                                             <div className="flex items-center justify-end gap-1 text-[10px] text-green-500 font-bold uppercase tracking-widest mt-0.5">
                                                 <CheckCircle2 className="w-3 h-3" />
                                                 Confirmed
                                             </div>
                                         ) : (
-                                            <div className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">Pending AI</div>
+                                            <div className="flex items-center justify-end gap-1 text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
+                                                <Info className="w-3 h-3" />
+                                                Pending AI
+                                            </div>
                                         )}
                                     </div>
                                 </div>
                             ))}
+                            {transactions.length === 0 && (
+                                <div className="py-10 text-center text-zinc-400 text-sm">No transactions found. Adding one!</div>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -21,6 +21,7 @@ import {
     Plus
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
+import { useAuth } from "@/app/context/AuthContext";
 
 const NAV_ITEMS = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const pathname = usePathname();
+    const { user, logout } = useAuth();
 
     return (
         <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex">
@@ -80,7 +82,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                     {/* Sidebar Footer */}
                     <div className="p-4 border-t border-border">
-                        <button className="flex items-center gap-3 w-full px-3 py-2.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all text-sm font-medium">
+                        <button
+                            onClick={logout}
+                            className="flex items-center gap-3 w-full px-3 py-2.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all text-sm font-medium"
+                        >
                             <LogOut className="w-5 h-5" />
                             Logout
                         </button>
@@ -120,11 +125,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                         <button className="flex items-center gap-2 pl-2 group">
                             <div className="w-8 h-8 rounded-lg bg-accent-secondary text-accent flex items-center justify-center font-bold text-xs uppercase">
-                                NM
+                                {user?.username?.substring(0, 2).toUpperCase() || "GU"}
                             </div>
                             <div className="hidden sm:block text-left">
-                                <p className="text-xs font-bold leading-none dark:text-white">Nishant</p>
-                                <p className="text-[10px] text-zinc-400 font-medium tracking-tight">Pro Plan</p>
+                                <p className="text-xs font-bold leading-none dark:text-white">{user?.username || "Guest User"}</p>
+                                <p className="text-[10px] text-zinc-400 font-medium tracking-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{user?.is_guest ? "Guest Mode" : (user?.email || user?.phone || "Pro Plan")}</p>
                             </div>
                             <ChevronDown className="w-4 h-4 text-zinc-400 group-hover:text-zinc-900 transition-colors" />
                         </button>

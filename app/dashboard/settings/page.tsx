@@ -1,25 +1,63 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
 import {
     User,
-    MapPin,
-    Globe,
     Shield,
     Database,
     Bell,
     Eye,
     ChevronRight,
+    Globe,
     Monitor,
-    Smartphone,
-    CreditCard,
     LogOut,
-    Save
+    Save,
+    MapPin,
+    Loader2,
+    Check
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
+import { useAuth } from "@/app/context/AuthContext";
+import { UserAPI } from "@/app/lib/api";
 
 export default function SettingsScreen() {
+    const { user, logout } = useAuth();
+
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [residence, setResidence] = useState("");
+
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
+
+    useEffect(() => {
+        if (user) {
+            // Split username for demo purposes if needed, or just assume username is single field
+            // Backend User model has `username`.
+            const parts = (user.username || "").split(" ");
+            setFirstName(parts[0] || "");
+            setLastName(parts.slice(1).join(" ") || "");
+            // Residence not in User model yet, mocking local state persistence or just field
+        }
+    }, [user]);
+
+    const handleSave = async () => {
+        setLoading(true);
+        try {
+            await UserAPI.updateProfile({
+                username: `${firstName} ${lastName}`.trim(),
+                // other fields if backend supported
+            });
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 2000);
+        } catch (err) {
+            console.error("Failed to update profile", err);
+        } finally {
+            setLoading(false);
+        }
+    }
+
     return (
         <DashboardLayout>
             <div className="max-w-5xl mx-auto space-y-10 pb-20">
@@ -58,15 +96,14 @@ export default function SettingsScreen() {
                         <div className="bg-white dark:bg-zinc-900 p-10 rounded-[2.5rem] border border-border shadow-sm">
                             <div className="flex flex-col sm:flex-row items-center gap-8 mb-10">
                                 <div className="w-24 h-24 rounded-[2rem] bg-accent-secondary flex items-center justify-center text-accent text-3xl font-bold font-rounded relative group cursor-pointer shadow-xl shadow-accent/10">
-                                    NM
+                                    {firstName[0]?.toUpperCase()}{lastName[0]?.toUpperCase()}
                                     <div className="absolute inset-0 bg-black/40 rounded-[2rem] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold uppercase">Change</div>
                                 </div>
                                 <div className="text-center sm:text-left">
-                                    <h3 className="text-2xl font-bold font-rounded">Nishant Munjal</h3>
-                                    <p className="text-zinc-500 text-sm font-medium">nishant@example.com • +91 99999 00000</p>
+                                    <h3 className="text-2xl font-bold font-rounded">{user?.username || "Guest User"}</h3>
+                                    <p className="text-zinc-500 text-sm font-medium">{user?.email || user?.phone || "No contact info"}</p>
                                     <div className="flex items-center gap-2 mt-4 justify-center sm:justify-start">
-                                        <span className="bg-accent/10 text-accent text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">Pro Member</span>
-                                        <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">Beta User</span>
+                                        <span className="bg-accent/10 text-accent text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">{user?.is_guest ? "Guest Mode" : "Verified User"}</span>
                                     </div>
                                 </div>
                             </div>
@@ -74,26 +111,49 @@ export default function SettingsScreen() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">First Name</label>
-                                    <input type="text" defaultValue="Nishant" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all font-medium" />
+                                    <input
+                                        type="text"
+                                        value={firstName}
+                                        onChange={(e) => setFirstName(e.target.value)}
+                                        className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all font-medium"
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">Last Name</label>
-                                    <input type="text" defaultValue="Munjal" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all font-medium" />
+                                    <input
+                                        type="text"
+                                        value={lastName}
+                                        onChange={(e) => setLastName(e.target.value)}
+                                        className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all font-medium"
+                                    />
                                 </div>
                                 <div className="sm:col-span-2 space-y-2">
                                     <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">Residence</label>
                                     <div className="relative">
                                         <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                                        <input type="text" defaultValue="Bangalore, Karnataka, India" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-2xl pl-12 pr-4 py-3.5 text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all font-medium" />
+                                        <input
+                                            type="text"
+                                            value={residence}
+                                            onChange={(e) => setResidence(e.target.value)}
+                                            placeholder="City, Country"
+                                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-2xl pl-12 pr-4 py-3.5 text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all font-medium"
+                                        />
                                     </div>
                                 </div>
                             </div>
 
                             <div className="mt-10 pt-8 border-t border-border flex justify-end gap-3">
                                 <button className="px-6 py-3 rounded-xl text-sm font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Discard Changes</button>
-                                <button className="flex items-center gap-2 bg-accent text-white px-8 py-3 rounded-xl font-bold text-sm shadow-xl shadow-accent/20 hover:scale-105 transition-all">
-                                    <Save className="w-4 h-4" />
-                                    Save Settings
+                                <button
+                                    onClick={handleSave}
+                                    disabled={loading}
+                                    className={cn(
+                                        "flex items-center gap-2 bg-accent text-white px-8 py-3 rounded-xl font-bold text-sm shadow-xl shadow-accent/20 hover:scale-105 transition-all disabled:opacity-70",
+                                        success && "bg-green-500 shadow-green-500/20"
+                                    )}
+                                >
+                                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : success ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                                    {success ? "Saved" : "Save Settings"}
                                 </button>
                             </div>
                         </div>
@@ -140,10 +200,15 @@ export default function SettingsScreen() {
                                 </div>
                                 <div>
                                     <h4 className="font-bold text-red-600 dark:text-red-400 leading-tight">Sign out of all devices</h4>
-                                    <p className="text-xs text-red-500/60 font-medium">Logged in on iPhone 15, MacBook Pro and 2 others.</p>
+                                    <p className="text-xs text-red-500/60 font-medium">Logged in on multiple devices.</p>
                                 </div>
                             </div>
-                            <button className="bg-red-500 text-white px-6 py-3 rounded-xl text-sm font-bold shadow-xl shadow-red-500/20 hover:scale-105 transition-all w-full sm:w-auto">Logout Everywhere</button>
+                            <button
+                                onClick={logout}
+                                className="bg-red-500 text-white px-6 py-3 rounded-xl text-sm font-bold shadow-xl shadow-red-500/20 hover:scale-105 transition-all w-full sm:w-auto"
+                            >
+                                Logout
+                            </button>
                         </div>
                     </div>
                 </div>
