@@ -38,6 +38,27 @@ export interface Transaction {
     created_at: string;
 }
 
+export interface AppNotification {
+    id: number;
+    user_id: number;
+    type: string;
+    title: string;
+    body: string;
+    action_url?: string;
+    read_at?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface NotificationListResponse {
+    notifications: AppNotification[];
+    unread_count: number;
+    page: number;
+    page_size: number;
+    total: number;
+    total_pages: number;
+}
+
 // --- API Client Setup ---
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -126,3 +147,21 @@ export const UserAPI = {
         return api.put<{ user: User }>("/v1/user", data);
     }
 }
+
+export const NotificationsAPI = {
+    list: async (status: "all" | "unread" | "read" = "all") => {
+        return api.get<NotificationListResponse>("/v1/notifications", { params: { status } });
+    },
+    unreadCount: async () => {
+        return api.get<{ unread_count: number }>("/v1/notifications/unread-count");
+    },
+    markRead: async (id: number) => {
+        return api.patch<AppNotification>(`/v1/notifications/${id}/read`);
+    },
+    markAllRead: async () => {
+        return api.patch<{ updated: number }>("/v1/notifications/read-all");
+    },
+    delete: async (id: number) => {
+        return api.delete(`/v1/notifications/${id}`);
+    },
+};
