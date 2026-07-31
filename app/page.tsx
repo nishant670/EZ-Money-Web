@@ -39,10 +39,9 @@ export default function Home() {
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-morphism py-3 shadow-sm" : "bg-transparent py-5"}`}>
         <div className="container mx-auto px-6 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 relative bg-accent rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-accent/20">
-              <Image src="/logo.png" alt="Finnri Logo" fill className="p-1 object-contain" />
+            <div className="relative flex h-11 w-28 items-center justify-center overflow-hidden rounded-xl bg-zinc-950 shadow-lg shadow-zinc-950/15">
+              <Image src="/finnri-logo.png" alt="Finnri" fill sizes="112px" className="scale-[2.35] object-contain" priority />
             </div>
-            <span className="text-xl font-bold tracking-tight font-rounded">Finnri</span>
           </Link>
 
           {/* Desktop Nav */}
@@ -574,10 +573,9 @@ export default function Home() {
         <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 relative bg-accent rounded-lg flex items-center justify-center shadow-lg shadow-accent/20">
-                <Image src="/logo.png" alt="Finnri Logo" fill className="p-1 object-contain" />
+              <div className="relative flex h-10 w-24 items-center justify-center overflow-hidden rounded-xl bg-zinc-950 shadow-lg shadow-zinc-950/15">
+                <Image src="/finnri-logo.png" alt="Finnri" fill sizes="96px" className="scale-[2.35] object-contain" />
               </div>
-              <span className="text-lg font-bold font-rounded">Finnri</span>
             </div>
 
             <div className="flex flex-wrap justify-center gap-8 text-sm font-medium text-text-muted">

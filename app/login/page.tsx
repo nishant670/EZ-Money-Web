@@ -102,7 +102,7 @@ export default function LoginPage() {
     const handleFinalAuth = async (event: FormEvent) => {
         event.preventDefault();
         if (!/^\d{4}$/.test(pin)) { setError("Enter a 4-digit PIN."); return; }
-        if (/^(\d)\1{3}$/.test(pin)) { setError("Choose a PIN with more than one distinct digit."); return; }
+        if (authMode !== "login" && /^(\d)\1{3}$/.test(pin)) { setError("Choose a PIN with more than one distinct digit."); return; }
         setIsLoading(true); setError(null);
         try {
             const deviceID = webDeviceID();
@@ -159,8 +159,8 @@ export default function LoginPage() {
             <div className="mx-auto flex min-h-[680px] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-white shadow-2xl shadow-accent/5 dark:bg-zinc-900 sm:rounded-[2.5rem]">
                 <div className="flex-1 p-6 sm:p-9">
                     <Link href="/" className="mx-auto flex w-fit flex-col items-center gap-3">
-                        <span className="relative grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-accent shadow-xl shadow-accent/20"><Image src="/logo.png" alt="Finnri" fill sizes="56px" className="object-contain p-1.5" /></span>
-                        <span className="text-center"><span className="block text-3xl font-bold tracking-tight font-rounded">Finnri</span><span className="mt-1 block text-xs font-medium text-zinc-400">Your money, understood.</span></span>
+                        <span className="relative grid h-16 w-36 place-items-center overflow-hidden rounded-2xl bg-zinc-950 shadow-xl shadow-zinc-950/15 dark:bg-zinc-800"><Image src="/finnri-logo.png" alt="Finnri" fill sizes="144px" className="scale-[2.35] object-contain" priority /></span>
+                        <span className="text-center text-xs font-medium text-zinc-400">Your money, understood.</span>
                     </Link>
 
                     <div className="mt-8">

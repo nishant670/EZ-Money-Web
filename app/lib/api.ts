@@ -97,6 +97,133 @@ export interface TransactionInput {
     time?: string;
     source_text?: string;
     account_id: number;
+    split?: EntrySplitInput | null;
+}
+
+export type SplitDirection = "friend_owes_user" | "user_owes_friend";
+export type SettlementDirection = "friend_paid_user" | "user_paid_friend";
+
+export interface SplitFriend {
+    id: number;
+    user_id: number;
+    name: string;
+    email: string;
+    phone: string;
+    archived: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SplitGroupMember {
+    id: number;
+    friend_id: number;
+    friend: SplitFriend;
+}
+
+export interface SplitGroup {
+    id: number;
+    user_id: number;
+    name: string;
+    archived: boolean;
+    members: SplitGroupMember[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SplitParticipant {
+    id: number;
+    friend_id: number;
+    friend: SplitFriend;
+    share_amount: number;
+    direction: SplitDirection;
+}
+
+export interface SplitBill {
+    id: number;
+    user_id: number;
+    entry_id?: number | null;
+    group_id?: number | null;
+    group?: SplitGroup | null;
+    title: string;
+    total_amount: number;
+    currency: "INR";
+    date: string;
+    notes: string;
+    participants: SplitParticipant[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SplitSettlement {
+    id: number;
+    user_id: number;
+    friend_id: number;
+    friend: SplitFriend;
+    amount: number;
+    direction: SettlementDirection;
+    date: string;
+    notes: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SplitBalance {
+    friend: SplitFriend;
+    total_owed_by_friend: number;
+    total_owed_to_friend: number;
+    net_balance: number;
+}
+
+export interface SplitActivityItem {
+    id: string;
+    type: "bill" | "settlement" | "friend_created" | "group_created";
+    record_id: number;
+    title: string;
+    date: string;
+    amount?: number;
+    group_id?: number;
+    group?: SplitGroup;
+    friend_id?: number;
+    friend?: SplitFriend;
+    direction?: SplitDirection | SettlementDirection;
+    participant_count?: number;
+    participants?: SplitParticipant[];
+    notes?: string;
+    created_at: string;
+}
+
+export interface SplitActivityResponse {
+    items: SplitActivityItem[];
+    page: number;
+    page_size: number;
+    total: number;
+}
+
+export interface SplitFriendInput { name: string; email: string; phone: string; }
+export interface SplitGroupInput { name: string; friend_ids: number[]; }
+export interface SplitParticipantInput { friend_id: number; share_amount: number; direction: SplitDirection; }
+export interface SplitBillInput {
+    entry_id?: number | null;
+    group_id?: number | null;
+    title: string;
+    total_amount: number;
+    currency: "INR";
+    date: string;
+    notes: string;
+    participants: SplitParticipantInput[];
+}
+export interface SplitSettlementInput { friend_id: number; amount: number; direction: SettlementDirection; date: string; notes: string; }
+export interface EntrySplitParticipantInput {
+    friend_id?: number;
+    friend?: SplitFriendInput;
+    share_amount: number;
+    direction: SplitDirection;
+}
+export interface EntrySplitInput {
+    group_id?: number;
+    group_name?: string;
+    notes?: string;
+    participants: EntrySplitParticipantInput[];
 }
 
 export interface ParsedTransaction {
@@ -350,6 +477,25 @@ export const SubscriptionsAPI = {
 export const ToolsAPI = {
     calculateEMI: (data: { principal_amount: number; annual_interest_rate_percent: number; tenure_months: number; currency: "INR" }) =>
         api.post<EMICalculation>("/v1/tools/emi/calculate", data),
+};
+
+export const SplitAPI = {
+    listFriends: (status: "active" | "all" = "active") => api.get<SplitFriend[]>("/v1/split/friends", { params: { status } }),
+    createFriend: (data: SplitFriendInput) => api.post<SplitFriend>("/v1/split/friends", data),
+    updateFriend: (id: number, data: SplitFriendInput) => api.put<SplitFriend>(`/v1/split/friends/${id}`, data),
+    archiveFriend: (id: number) => api.delete(`/v1/split/friends/${id}`),
+    listGroups: (status: "active" | "all" = "active") => api.get<SplitGroup[]>("/v1/split/groups", { params: { status } }),
+    createGroup: (data: SplitGroupInput) => api.post<SplitGroup>("/v1/split/groups", data),
+    updateGroup: (id: number, data: SplitGroupInput) => api.put<SplitGroup>(`/v1/split/groups/${id}`, data),
+    archiveGroup: (id: number) => api.delete(`/v1/split/groups/${id}`),
+    listBills: () => api.get<SplitBill[]>("/v1/split/bills"),
+    createBill: (data: SplitBillInput) => api.post<SplitBill>("/v1/split/bills", data),
+    updateBill: (id: number, data: SplitBillInput) => api.put<SplitBill>(`/v1/split/bills/${id}`, data),
+    deleteBill: (id: number) => api.delete(`/v1/split/bills/${id}`),
+    listSettlements: () => api.get<SplitSettlement[]>("/v1/split/settlements"),
+    createSettlement: (data: SplitSettlementInput) => api.post<SplitSettlement>("/v1/split/settlements", data),
+    activity: (page = 1, pageSize = 20) => api.get<SplitActivityResponse>("/v1/split/activity", { params: { page, page_size: pageSize } }),
+    balances: () => api.get<SplitBalance[]>("/v1/split/balances"),
 };
 
 export const UserAPI = {

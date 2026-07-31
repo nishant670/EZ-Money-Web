@@ -10,6 +10,7 @@ import {
     Calculator,
     CheckCheck,
     Inbox,
+    HandCoins,
     LayoutDashboard,
     LogOut,
     Menu,
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
     { name: "Insights", href: "/dashboard/insights", icon: BarChart3 },
     { name: "Transactions", href: "/dashboard/transactions", icon: TableProperties },
     { name: "Accounts", href: "/dashboard/accounts", icon: Wallet },
+    { name: "Splits", href: "/dashboard/splits", icon: HandCoins },
     { name: "Planning & tools", href: "/dashboard/tools", icon: Calculator },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
@@ -118,13 +120,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}>
                 <div className="flex h-20 items-center justify-between border-b border-border px-6">
                     <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setIsSidebarOpen(false)}>
-                        <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-2xl bg-accent shadow-lg shadow-accent/20">
-                            <Image src="/logo.png" alt="Finnri" fill sizes="40px" className="object-contain p-1.5" />
+                        <span className="relative grid h-10 w-24 place-items-center overflow-hidden rounded-xl bg-zinc-950 shadow-lg shadow-zinc-950/15 dark:bg-zinc-800">
+                            <Image src="/finnri-logo.png" alt="Finnri" fill sizes="96px" className="scale-[2.35] object-contain" priority />
                         </span>
-                        <span>
-                            <span className="block text-xl font-bold tracking-tight font-rounded">Finnri</span>
-                            <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Money clarity</span>
-                        </span>
+                        <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Money clarity</span>
                     </Link>
                     <button className="rounded-xl p-2 text-zinc-400 lg:hidden" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation">
                         <X className="h-5 w-5" />

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, AuthAPI } from "@/app/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -25,22 +25,27 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-    const [user, setUser] = useState<User | null>(() => {
-        if (typeof window === "undefined") return null;
+    const [user, setUser] = useState<User | null>(null);
+    const [token, setToken] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const router = useRouter();
+
+    useEffect(() => {
         const savedUser = localStorage.getItem("finnri_user");
-        if (!savedUser) return null;
+        let restoredUser: User | null = null;
         try {
-            return JSON.parse(savedUser) as User;
+            if (savedUser) restoredUser = JSON.parse(savedUser) as User;
         } catch {
             localStorage.removeItem("finnri_user");
-            return null;
         }
-    });
-    const [token, setToken] = useState<string | null>(() =>
-        typeof window === "undefined" ? null : localStorage.getItem("finnri_token"),
-    );
-    const isLoading = false;
-    const router = useRouter();
+        const restoredToken = localStorage.getItem("finnri_token");
+        const restoreTimer = window.setTimeout(() => {
+            setUser(restoredUser);
+            setToken(restoredToken);
+            setIsLoading(false);
+        }, 0);
+        return () => window.clearTimeout(restoreTimer);
+    }, []);
 
     const login = (newToken: string, newUser: User) => {
         setToken(newToken);

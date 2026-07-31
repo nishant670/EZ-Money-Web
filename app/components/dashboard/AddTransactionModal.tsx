@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Account, AccountsAPI, apiErrorMessage, EntriesAPI } from "@/app/lib/api";
+import { Account, AccountsAPI, apiErrorMessage, EntriesAPI, EntrySplitInput, SplitAPI, SplitFriend, SplitGroup } from "@/app/lib/api";
+import InlineSplitEditor from "@/app/components/dashboard/InlineSplitEditor";
 
 interface AddTransactionModalProps {
     isOpen: boolean;
@@ -39,6 +40,9 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
     const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16));
     const [accountID, setAccountID] = useState<number | "">("");
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [splitFriends, setSplitFriends] = useState<SplitFriend[]>([]);
+    const [splitGroups, setSplitGroups] = useState<SplitGroup[]>([]);
+    const [entrySplit, setEntrySplit] = useState<EntrySplitInput | null>(null);
     const [tags, setTags] = useState<string[]>([]);
     const [newTag, setNewTag] = useState("");
     const [showTagInput, setShowTagInput] = useState(false);
@@ -47,13 +51,15 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
     useEffect(() => {
         if (!isOpen) return;
         let active = true;
-        AccountsAPI.list().then((response) => {
+        Promise.allSettled([AccountsAPI.list(), SplitAPI.listFriends(), SplitAPI.listGroups()]).then(([accountsResult, friendsResult, groupsResult]) => {
             if (!active) return;
-            setAccounts(response.data);
-            const preferred = response.data.find((item) => item.is_default) || response.data[0];
-            setAccountID((current) => current || preferred?.id || "");
-        }).catch((requestError) => {
-            if (active) setError(apiErrorMessage(requestError, "We couldn’t load your accounts."));
+            if (accountsResult.status === "fulfilled") {
+                setAccounts(accountsResult.value.data);
+                const preferred = accountsResult.value.data.find((item) => item.is_default) || accountsResult.value.data[0];
+                setAccountID((current) => current || preferred?.id || "");
+            } else setError(apiErrorMessage(accountsResult.reason, "We couldn’t load your accounts."));
+            if (friendsResult.status === "fulfilled") setSplitFriends(friendsResult.value.data);
+            if (groupsResult.status === "fulfilled") setSplitGroups(groupsResult.value.data);
         });
         return () => { active = false; };
     }, [isOpen]);
@@ -67,6 +73,7 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
         setDate(new Date().toISOString().slice(0, 16));
         setAccountID("");
         setTags([]);
+        setEntrySplit(null);
         setMode("quick");
         setSuccess(false);
         setError("");
@@ -111,6 +118,13 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
             setError("Amount, merchant, and account are required.");
             return;
         }
+        const numericAmount = parseFloat(amount);
+        if (entrySplit) {
+            const invalidParticipant = entrySplit.participants.some((participant) => !participant.friend_id || participant.share_amount <= 0);
+            const totalShares = entrySplit.participants.reduce((sum, participant) => sum + Number(participant.share_amount || 0), 0);
+            if (invalidParticipant) { setError("Choose a friend and positive share for every split participant."); return; }
+            if (totalShares > numericAmount) { setError("Friend shares cannot exceed the transaction amount."); return; }
+        }
         setSaving(true);
         setError("");
         try {
@@ -118,7 +132,7 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
             const entryMode = selectedAccount?.type === "upi" ? "UPI" : selectedAccount?.type === "credit_card" || selectedAccount?.type === "debit_card" || selectedAccount?.type === "bank" ? "Credit Card" : selectedAccount?.type === "wallet" ? "Wallets" : "Cash";
             await EntriesAPI.create({
                 type,
-                amount: parseFloat(amount),
+                amount: numericAmount,
                 currency: "INR",
                 source: text.trim() ? "text" : "manual",
                 title, // or merchant
@@ -129,6 +143,7 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
                 mode: entryMode,
                 account_id: accountID,
                 tags,
+                split: type === "expense" ? entrySplit || undefined : undefined,
             });
             setSuccess(true);
             setTimeout(() => {
@@ -259,7 +274,7 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
                                                     Expense
                                                 </button>
                                                 <button
-                                                    onClick={() => setType("income")}
+                                                    onClick={() => { setType("income"); setEntrySplit(null); }}
                                                     className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", type === "income" ? "bg-white dark:bg-zinc-700 text-green-500 shadow-sm" : "text-zinc-400")}
                                                 >
                                                     Income
@@ -342,6 +357,8 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
                                             </div>
                                         </div>
                                     </div>
+
+                                    {type === "expense" && <InlineSplitEditor amount={Number(amount || 0)} friends={splitFriends} groups={splitGroups} value={entrySplit} onChange={setEntrySplit} />}
 
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Tags</label>

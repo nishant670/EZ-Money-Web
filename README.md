@@ -1,7 +1,8 @@
 # FINNRI Web
 
 FINNRI's big-screen dashboard for explainable spending insights, transaction
-management, accounts, budgets, recurring payments, and financial calculators.
+management, accounts, shared-expense ledgers, budgets, recurring payments, and
+financial calculators.
 
 ## Local setup
 
@@ -22,6 +23,8 @@ web origin through the backend CORS configuration.
 - Transactions: list/search/filter/paginate, create, parse, duplicate, delete,
   account linking, and CSV export of the current result page.
 - Accounts: list, create, update, set default, and guarded delete.
+- Splits: friends, groups, shared bills, inline transaction splits, balances,
+  settlements, and activity history.
 - Notifications: list, unread count, mark one/all read.
 - Planning: budgets, recurring-payment schedules, and mark-paid actions.
 - Tools: backend-powered EMI calculation and amortization schedule.

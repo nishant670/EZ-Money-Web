@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
     X,
     Trash2,
@@ -10,11 +11,12 @@ import {
     Clock,
     ShieldCheck,
     Copy,
-    Loader2
+    Loader2,
+    Users
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiErrorMessage, EntriesAPI, Transaction, TransactionInput } from "@/app/lib/api";
+import { apiErrorMessage, EntriesAPI, SplitAPI, SplitBill, Transaction, TransactionInput } from "@/app/lib/api";
 
 interface TransactionDetailsDrawerProps {
     isOpen: boolean;
@@ -24,6 +26,16 @@ interface TransactionDetailsDrawerProps {
 
 export default function TransactionDetailsDrawer({ isOpen, onClose, transaction }: TransactionDetailsDrawerProps) {
     const [loading, setLoading] = useState(false);
+    const [splitBill, setSplitBill] = useState<SplitBill | null>(null);
+
+    useEffect(() => {
+        let active = true;
+        if (!isOpen || !transaction) return;
+        SplitAPI.listBills().then((response) => {
+            if (active) setSplitBill(response.data.find((bill) => bill.entry_id === transaction.id) || null);
+        }).catch(() => { if (active) setSplitBill(null); });
+        return () => { active = false; };
+    }, [isOpen, transaction]);
 
     if (!transaction) return null;
 
@@ -140,6 +152,8 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                                         {(!transaction.tags || transaction.tags.length === 0) && <span className="text-xs text-zinc-400 px-3">No tags</span>}
                                     </div>
                                 </div>
+
+                                {splitBill?.entry_id === transaction.id && <div className="rounded-3xl border border-accent/20 bg-accent/5 p-5"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-accent/10 text-accent"><Users className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-accent">Shared expense</p><p className="mt-1 text-sm font-bold">{splitBill.participants.length} friend share{splitBill.participants.length === 1 ? "" : "s"}</p><p className="mt-2 text-xs leading-5 text-zinc-500">{splitBill.participants.map((participant) => `${participant.friend.name}: ₹${participant.share_amount}`).join(" · ")}</p><Link href="/dashboard/splits" onClick={onClose} className="mt-3 inline-block text-xs font-bold text-accent underline">Open split ledger</Link></div></div></div>}
                             </div>
                         </div>
 
