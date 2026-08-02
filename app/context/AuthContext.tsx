@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, AuthAPI } from "@/app/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -31,20 +31,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const router = useRouter();
 
     useEffect(() => {
-        // Hydrate from localStorage
-        const savedToken = localStorage.getItem("finnri_token");
         const savedUser = localStorage.getItem("finnri_user");
-
-        if (savedToken && savedUser) {
-            setToken(savedToken);
-            try {
-                setUser(JSON.parse(savedUser));
-            } catch (e) {
-                console.error("Failed to parse user", e);
-                localStorage.removeItem("finnri_user");
-            }
+        let restoredUser: User | null = null;
+        try {
+            if (savedUser) restoredUser = JSON.parse(savedUser) as User;
+        } catch {
+            localStorage.removeItem("finnri_user");
         }
-        setIsLoading(false);
+        const restoredToken = localStorage.getItem("finnri_token");
+        const restoreTimer = window.setTimeout(() => {
+            setUser(restoredUser);
+            setToken(restoredToken);
+            setIsLoading(false);
+        }, 0);
+        return () => window.clearTimeout(restoreTimer);
     }, []);
 
     const login = (newToken: string, newUser: User) => {
@@ -59,13 +59,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(null);
         localStorage.removeItem("finnri_token");
         localStorage.removeItem("finnri_user");
-        router.push("/login"); // Redirect to login
+        router.push("/login");
     };
 
     const loginAsGuest = async () => {
         try {
-            // Mock device ID for web guest
-            const deviceId = "web_guest_" + Math.random().toString(36).substring(7);
+            const storedDeviceId = localStorage.getItem("finnri_web_device_id");
+            const deviceId = storedDeviceId || `web_${crypto.randomUUID()}`;
+            localStorage.setItem("finnri_web_device_id", deviceId);
             const res = await AuthAPI.loginGuest(deviceId);
 
             const { token, user } = res.data;

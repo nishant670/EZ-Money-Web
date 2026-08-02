@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FINNRI Web
 
-## Getting Started
+FINNRI's big-screen dashboard for explainable spending insights, transaction
+management, accounts, shared-expense ledgers, budgets, recurring payments, and
+financial calculators.
 
-First, run the development server:
+## Local setup
 
 ```bash
+cp .env.example .env.local
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The frontend reads `NEXT_PUBLIC_API_URL` and defaults to
+`http://localhost:8080`. Start the Go API from `../EZ-Money-BE` and allow the
+web origin through the backend CORS configuration.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Current API coverage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Authentication: guest, identify, OTP, registration, and PIN login.
+- Overview and insights: `GET /v1/dashboard` with date ranges and timezone.
+- Transactions: list/search/filter/paginate, create, parse, duplicate, delete,
+  account linking, and CSV export of the current result page.
+- Accounts: list, create, update, set default, and guarded delete.
+- Splits: friends, groups, shared bills, inline transaction splits, balances,
+  settlements, and activity history.
+- Notifications: list, unread count, mark one/all read.
+- Planning: budgets, recurring-payment schedules, and mark-paid actions.
+- Tools: backend-powered EMI calculation and amortization schedule.
+- Profile: username update.
 
-## Learn More
+Bank sync, statement imports, bulk editing, open-ended AI advice, and generated
+financial forecasts are intentionally not claimed by the web product.
 
-To learn more about Next.js, take a look at the following resources:
+## Quality checks
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```

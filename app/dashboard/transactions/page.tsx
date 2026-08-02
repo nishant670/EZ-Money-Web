@@ -1,375 +1,90 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-    Search,
-    Filter,
+    CalendarRange,
+    ChevronLeft,
+    ChevronRight,
+    CircleAlert,
     Download,
-    MoreHorizontal,
-    ChevronDown,
-    Check,
-    ExternalLink,
-    Trash2,
-    Tag,
-    FolderInput,
+    Filter,
+    Loader2,
     Plus,
-    ArrowUpDown,
-    Calendar,
+    Search,
     Wallet,
-    Info,
-    X,
-    Loader2
 } from "lucide-react";
-import { cn } from "@/app/lib/utils";
+import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
 import AddTransactionModal from "@/app/components/dashboard/AddTransactionModal";
 import TransactionDetailsDrawer from "@/app/components/dashboard/TransactionDetailsDrawer";
-import { EntriesAPI, Transaction } from "@/app/lib/api";
+import { Account, AccountsAPI, apiErrorMessage, EntriesAPI, EntryListParams, Transaction } from "@/app/lib/api";
+import { cn } from "@/app/lib/utils";
+
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });
+
+function isoDate(date: Date) {
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+    return date.toISOString().slice(0, 10);
+}
+
+function csvCell(value: string | number) {
+    return `"${String(value).replaceAll('"', '""')}"`;
+}
 
 export default function TransactionsScreen() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedRows, setSelectedRows] = useState<number[]>([]);
-    const [showFilters, setShowFilters] = useState(false);
-
-    // Modals
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
-
-    // Filters State
+    const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
-    const [filterType, setFilterType] = useState("All"); // All, Expense, Income
-    const [filterAccount, setFilterAccount] = useState("All Accounts");
-    const [filterDateRange, setFilterDateRange] = useState("Last 30 Days");
+    const [type, setType] = useState<"all" | "expense" | "income">("all");
+    const [accountID, setAccountID] = useState<number | "">("");
+    const [dateRange, setDateRange] = useState<"all" | "30d" | "month">("30d");
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
     useEffect(() => {
-        fetchTransactions();
-    }, [filterType, filterAccount, filterDateRange, isModalOpen, isDrawerOpen]);
+        const query = new URLSearchParams(window.location.search).get("q");
+        if (query) setSearchTerm(query);
+        AccountsAPI.list().then((response) => setAccounts(response.data)).catch(() => setAccounts([]));
+    }, []);
 
-    const fetchTransactions = async () => {
-        setLoading(true);
+    const loadTransactions = useCallback(async () => {
+        setLoading(true); setError("");
+        const params: EntryListParams = { page, page_size: 25 };
+        if (searchTerm.trim()) params.q = searchTerm.trim();
+        if (type !== "all") params.type = type;
+        if (accountID) params.account_id = accountID;
+        if (dateRange !== "all") {
+            const end = new Date(); const start = new Date(end);
+            if (dateRange === "month") start.setDate(1); else start.setDate(end.getDate() - 29);
+            params.start_date = isoDate(start); params.end_date = isoDate(end);
+        }
         try {
-            const params: any = {};
-            if (filterType !== "All") params.type = filterType.toLowerCase();
-            // Backend currently supports specific query params.
-            // We might need client-side filtering for some if backend assumes exact match or specific logic.
-            // For now, let's just fetch all and filter client side for search, and use backend params for basic filters if possible.
-            // Based on API review: listEntries supports: type, category, mode, min_amount, start_date, etc.
+            const response = await EntriesAPI.list(params);
+            setTransactions(response.data.entries);
+            setTotalPages(Math.max(1, response.data.total_pages));
+            setTotal(response.data.total);
+        } catch (requestError) {
+            setError(apiErrorMessage(requestError, "We couldn’t load your transactions."));
+        } finally { setLoading(false); }
+    }, [accountID, dateRange, page, searchTerm, type]);
 
-            const res = await EntriesAPI.list(params);
-            setTransactions(res.data);
-        } catch (err) {
-            console.error("Failed to fetch transactions", err);
-        } finally {
-            setLoading(false);
-        }
+    useEffect(() => { const timer = window.setTimeout(() => void loadTransactions(), 250); return () => window.clearTimeout(timer); }, [loadTransactions]);
+
+    const exportCurrentView = () => {
+        if (!transactions.length) return;
+        const rows = [["Date", "Type", "Merchant", "Category", "Account", "Amount", "Currency"], ...transactions.map((item) => [item.date, item.type, item.merchant || item.title, item.category, item.account?.name || item.mode, item.amount, item.currency || "INR"])];
+        const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+        const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+        const link = document.createElement("a"); link.href = url; link.download = `finnri-transactions-${isoDate(new Date())}.csv`; link.click(); URL.revokeObjectURL(url);
     };
 
-    // Client-side filtering for search (until backend search API is robust)
-    const filteredTransactions = transactions.filter(t => {
-        if (searchTerm && !t.merchant?.toLowerCase().includes(searchTerm.toLowerCase()) &&
-            !t.category.toLowerCase().includes(searchTerm.toLowerCase()) &&
-            !t.title?.toLowerCase().includes(searchTerm.toLowerCase())) {
-            return false;
-        }
-        return true;
-    });
-
-    const openDrawer = (txn: Transaction) => {
-        setSelectedTxn(txn);
-        setIsDrawerOpen(true);
-    };
-
-    const toggleSelectAll = () => {
-        if (selectedRows.length === filteredTransactions.length) {
-            setSelectedRows([]);
-        } else {
-            setSelectedRows(filteredTransactions.map(t => t.ID));
-        }
-    };
-
-    const toggleSelectRow = (id: number) => {
-        if (selectedRows.includes(id)) {
-            setSelectedRows(selectedRows.filter(rowId => rowId !== id));
-        } else {
-            setSelectedRows([...selectedRows, id]);
-        }
-    };
-
-    const handleDelete = async (id: number) => {
-        // In a real app, show confirmation toast/undo
-        await EntriesAPI.delete(id);
-        fetchTransactions();
-        if (id === selectedTxn?.ID) setIsDrawerOpen(false);
-    }
-
-    return (
-        <DashboardLayout>
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold font-rounded tracking-tight dark:text-white">Transactions</h1>
-                        <p className="text-zinc-500 text-sm font-medium mt-1">Manage and organize all your financial data.</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-zinc-200 transition-colors">
-                            <Download className="w-4 h-4" />
-                            Export
-                        </button>
-                        <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="flex items-center gap-2 bg-accent text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-xl shadow-accent/20 hover:scale-105 transition-all"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Add New
-                        </button>
-                    </div>
-                </div>
-
-                {/* Filters & Search */}
-                <div className="flex flex-col lg:flex-row gap-4">
-                    <div className="relative flex-1 group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-accent" />
-                        <input
-                            type="text"
-                            placeholder="Search by merchant, category, or amount..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-white dark:bg-zinc-900 border border-border rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition-all"
-                        />
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setShowFilters(!showFilters)}
-                            className={cn(
-                                "flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-sm transition-all border",
-                                showFilters ? "bg-accent text-white border-accent" : "bg-white dark:bg-zinc-900 border-border text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50"
-                            )}
-                        >
-                            <Filter className="w-4 h-4" />
-                            Advanced Filters
-                            {showFilters ? <X className="w-3 h-3 ml-1" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                        <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 border border-border rounded-xl px-2 py-1">
-                            {["All", "Expense", "Income"].map(type => (
-                                <button
-                                    key={type}
-                                    onClick={() => setFilterType(type)}
-                                    className={cn(
-                                        "px-3 py-1.5 text-xs font-bold rounded-lg transition-colors",
-                                        filterType === type ? "text-accent bg-accent/10" : "text-zinc-500 hover:text-zinc-900"
-                                    )}
-                                >
-                                    {type === "Expense" ? "Expenses" : (type === "Income" ? "Income" : "All")}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Active Filters Panel */}
-                {showFilters && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-8 bg-white dark:bg-zinc-900 border border-border rounded-[2rem] shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                                <Calendar className="w-3 h-3" /> Date Range
-                            </label>
-                            <select
-                                value={filterDateRange}
-                                onChange={(e) => setFilterDateRange(e.target.value)}
-                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl px-4 py-2.5 text-sm outline-none"
-                            >
-                                <option>Last 30 Days</option>
-                                <option>Custom Range</option>
-                                <option>This Month</option>
-                                <option>Last Quarter</option>
-                            </select>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                                <Wallet className="w-3 h-3" /> Account
-                            </label>
-                            <select
-                                value={filterAccount}
-                                onChange={(e) => setFilterAccount(e.target.value)}
-                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl px-4 py-2.5 text-sm outline-none"
-                            >
-                                <option>All Accounts</option>
-                                <option>HDFC Card</option>
-                                <option>ICICI Bank</option>
-                                <option>Paytm Wallet</option>
-                            </select>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                                <ArrowUpDown className="w-3 h-3" /> Amount Range
-                            </label>
-                            <div className="flex items-center gap-2">
-                                <input type="text" placeholder="Min" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl px-3 py-2 text-sm outline-none" />
-                                <span className="text-zinc-300">-</span>
-                                <input type="text" placeholder="Max" className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl px-3 py-2 text-sm outline-none" />
-                            </div>
-                        </div>
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchTransactions}
-                                className="w-full bg-accent text-white py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-accent/20"
-                            >
-                                Apply Filters
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Transactions Table Section */}
-                <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-border shadow-sm overflow-hidden flex flex-col relative min-h-[400px]">
-
-                    {/* Bulk Actions Bar */}
-                    {selectedRows.length > 0 && (
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-6 z-30 animate-in slide-in-from-bottom-8 duration-300">
-                            <span className="text-sm font-bold">{selectedRows.length} selected</span>
-                            <div className="h-4 w-px bg-zinc-700 dark:bg-zinc-300" />
-                            <div className="flex items-center gap-4">
-                                <button className="flex items-center gap-2 text-xs font-bold hover:text-accent transition-colors"><Tag className="w-4 h-4" /> Category</button>
-                                <button className="flex items-center gap-2 text-xs font-bold hover:text-accent transition-colors"><FolderInput className="w-4 h-4" /> Account</button>
-                                <button className="flex items-center gap-2 text-xs font-bold hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /> Delete</button>
-                            </div>
-                            <button
-                                onClick={() => setSelectedRows([])}
-                                className="p-1 hover:bg-white/10 dark:hover:bg-zinc-100 rounded-full transition-colors"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="overflow-x-auto flex-1">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-border">
-                                    <th className="p-5 w-12">
-                                        <button
-                                            onClick={toggleSelectAll}
-                                            className={cn(
-                                                "w-5 h-5 rounded border-2 transition-all flex items-center justify-center",
-                                                (selectedRows.length === filteredTransactions.length && filteredTransactions.length > 0) ? "bg-accent border-accent text-white" : "border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900"
-                                            )}
-                                        >
-                                            {selectedRows.length === filteredTransactions.length && filteredTransactions.length > 0 && <Check className="w-3 h-3" />}
-                                        </button>
-                                    </th>
-                                    <th className="p-5 text-xs font-bold uppercase tracking-widest text-zinc-400">Date <ArrowUpDown className="w-3 h-3 inline ml-1" /></th>
-                                    <th className="p-5 text-xs font-bold uppercase tracking-widest text-zinc-400">Merchant</th>
-                                    <th className="p-5 text-xs font-bold uppercase tracking-widest text-zinc-400">Category</th>
-                                    <th className="p-5 text-xs font-bold uppercase tracking-widest text-zinc-400">Mode</th>
-                                    <th className="p-5 text-xs font-bold uppercase tracking-widest text-zinc-400">Amount <ArrowUpDown className="w-3 h-3 inline ml-1" /></th>
-                                    <th className="p-5 text-xs font-bold uppercase tracking-widest text-zinc-400 text-center">Status</th>
-                                    <th className="p-5 text-xs font-bold uppercase tracking-widest text-zinc-400"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={8} className="p-10 text-center">
-                                            <div className="flex justify-center items-center gap-2 text-zinc-400">
-                                                <Loader2 className="animate-spin w-5 h-5" /> Loading transactions...
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : filteredTransactions.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={8} className="p-10 text-center text-zinc-400">No transactions found.</td>
-                                    </tr>
-                                ) : (
-                                    filteredTransactions.map((row) => (
-                                        <tr
-                                            key={row.ID}
-                                            onClick={() => openDrawer(row)}
-                                            className={cn(
-                                                "border-b border-border group hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors cursor-pointer",
-                                                selectedRows.includes(row.ID) && "bg-accent/5 dark:bg-accent/10"
-                                            )}
-                                        >
-                                            <td className="p-5" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                    onClick={() => toggleSelectRow(row.ID)}
-                                                    className={cn(
-                                                        "w-5 h-5 rounded border-2 transition-all flex items-center justify-center",
-                                                        selectedRows.includes(row.ID) ? "bg-accent border-accent text-white" : "border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900"
-                                                    )}
-                                                >
-                                                    {selectedRows.includes(row.ID) && <Check className="w-3 h-3" />}
-                                                </button>
-                                            </td>
-                                            <td className="p-5 text-sm font-medium text-zinc-500 whitespace-nowrap">{row.date}</td>
-                                            <td className="p-5">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold dark:text-white">{row.merchant || row.title}</span>
-                                                    <div className="flex gap-1 mt-1.5 overflow-hidden">
-                                                        {(row.tags || []).slice(0, 2).map((tag, i) => (
-                                                            <span key={i} className="text-[10px] font-bold px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-md uppercase tracking-tight">{tag}</span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <span className="text-xs font-bold text-accent bg-accent/10 px-3 py-1.5 rounded-full">{row.category}</span>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                                                    <Wallet className="w-3.5 h-3.5" />
-                                                    {row.mode}
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <span className={cn("text-sm font-bold", row.type === "income" ? "text-green-500" : "dark:text-white")}>
-                                                    {row.type === "income" ? "+" : "-"}₹{row.amount}
-                                                </span>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex justify-center">
-                                                    {row.status === "confirmed" ? (
-                                                        <div className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg" title="Confirmed">
-                                                            <Check className="w-4 h-4" />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-6 h-6 flex items-center justify-center bg-amber-500/10 text-amber-500 rounded-lg" title="Pending AI Verification">
-                                                            <Info className="w-4 h-4" />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                                    <button className="p-2 text-zinc-400 hover:text-accent rounded-lg transition-colors"><ExternalLink className="w-4 h-4" /></button>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDelete(row.ID); }} className="p-2 text-zinc-400 hover:text-red-500 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                                    <button className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors"><MoreHorizontal className="w-4 h-4" /></button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Footer Info / Pagination */}
-                    <div className="p-5 flex items-center justify-between border-t border-border bg-zinc-50 dark:bg-zinc-800/30">
-                        <div className="flex items-center gap-3 text-xs font-bold text-zinc-400 uppercase tracking-widest">
-                            <span>Showing {filteredTransactions.length} entries</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <button className="px-3 py-2 text-sm font-bold border border-border rounded-xl hover:bg-white dark:hover:bg-zinc-800 opacity-50 cursor-not-allowed transition-all">Previous</button>
-                            <button className="px-3 py-2 text-sm font-bold border border-border rounded-xl hover:bg-white dark:hover:bg-zinc-800 transition-all opacity-50 cursor-not-allowed">Next</button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Modals & Drawers */}
-                <AddTransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-                <TransactionDetailsDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} transaction={selectedTxn} />
-            </div>
-        </DashboardLayout>
-    );
+    return <DashboardLayout><div className="space-y-6 pb-12"><header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">Confirmed records</p><h1 className="mt-2 text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Transactions</h1><p className="mt-2 text-sm text-zinc-500">Search, filter, inspect, add, duplicate, or delete real entries.</p></div><div className="flex gap-3"><button onClick={exportCurrentView} disabled={!transactions.length} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-bold text-zinc-600 disabled:opacity-40 dark:bg-zinc-900 dark:text-zinc-300"><Download className="h-4 w-4" /> Export view</button><button onClick={() => setIsModalOpen(true)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-white shadow-lg shadow-accent/20"><Plus className="h-4 w-4" /> Add</button></div></header>
+        <section className="rounded-[1.75rem] border border-border bg-white p-4 dark:bg-zinc-900"><div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]"><label className="relative"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" /><span className="sr-only">Search transactions</span><input value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setPage(1); }} placeholder="Merchant, title, or note…" className="min-h-11 w-full rounded-xl bg-zinc-100 pl-11 pr-4 text-sm outline-none focus:ring-4 focus:ring-accent/10 dark:bg-zinc-800" /></label><label className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" /><span className="sr-only">Transaction type</span><select value={type} onChange={(event) => { setType(event.target.value as typeof type); setPage(1); }} className="min-h-11 appearance-none rounded-xl bg-zinc-100 pl-10 pr-8 text-sm font-semibold outline-none dark:bg-zinc-800"><option value="all">All types</option><option value="expense">Expenses</option><option value="income">Income</option></select></label><label className="relative"><Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" /><span className="sr-only">Account</span><select value={accountID} onChange={(event) => { setAccountID(event.target.value ? Number(event.target.value) : ""); setPage(1); }} className="min-h-11 max-w-56 appearance-none rounded-xl bg-zinc-100 pl-10 pr-8 text-sm font-semibold outline-none dark:bg-zinc-800"><option value="">All accounts</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label><label className="relative"><CalendarRange className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" /><span className="sr-only">Date range</span><select value={dateRange} onChange={(event) => { setDateRange(event.target.value as typeof dateRange); setPage(1); }} className="min-h-11 appearance-none rounded-xl bg-zinc-100 pl-10 pr-8 text-sm font-semibold outline-none dark:bg-zinc-800"><option value="30d">Last 30 days</option><option value="month">This month</option><option value="all">All time</option></select></label></div></section>
+        {error && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><div><p>{error}</p><button onClick={() => void loadTransactions()} className="mt-2 font-bold underline">Try again</button></div></div>}
+        <section className="overflow-hidden rounded-[2rem] border border-border bg-white dark:bg-zinc-900"><div className="flex items-center justify-between border-b border-border px-6 py-4"><p className="text-sm font-bold">{total.toLocaleString("en-IN")} matching records</p><p className="text-xs text-zinc-400">Page {page} of {totalPages}</p></div><div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left"><thead className="bg-zinc-50 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:bg-zinc-800/60"><tr><th className="px-6 py-4">Date</th><th className="px-6 py-4">Merchant</th><th className="px-6 py-4">Category</th><th className="px-6 py-4">Account</th><th className="px-6 py-4 text-right">Amount</th></tr></thead><tbody className="divide-y divide-border">{loading ? <tr><td colSpan={5} className="h-72 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" /><p className="mt-3 text-sm text-zinc-400">Loading transactions…</p></td></tr> : transactions.length === 0 ? <tr><td colSpan={5} className="h-72 text-center text-sm text-zinc-400">No transactions match these filters.</td></tr> : transactions.map((transaction) => <tr key={transaction.id} onClick={() => setSelectedTransaction(transaction)} className="cursor-pointer transition hover:bg-zinc-50 dark:hover:bg-zinc-800/40"><td className="px-6 py-4 text-sm text-zinc-500">{transaction.date}</td><td className="px-6 py-4"><p className="text-sm font-bold">{transaction.merchant || transaction.title}</p><p className="mt-0.5 text-xs capitalize text-zinc-400">{transaction.type}</p></td><td className="px-6 py-4 text-sm text-zinc-500">{transaction.category}</td><td className="px-6 py-4 text-sm text-zinc-500">{transaction.account?.name || transaction.mode}</td><td className={cn("px-6 py-4 text-right text-sm font-bold", transaction.type === "income" && "text-emerald-600")}>{transaction.type === "income" ? "+" : "−"}{currency.format(transaction.amount)}</td></tr>)}</tbody></table></div><div className="flex items-center justify-end gap-2 border-t border-border p-4"><button disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)} className="grid h-10 w-10 place-items-center rounded-xl border border-border disabled:opacity-30" aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button><button disabled={page >= totalPages || loading} onClick={() => setPage((value) => value + 1)} className="grid h-10 w-10 place-items-center rounded-xl border border-border disabled:opacity-30" aria-label="Next page"><ChevronRight className="h-4 w-4" /></button></div></section>
+    </div><AddTransactionModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); void loadTransactions(); }} /><TransactionDetailsDrawer isOpen={Boolean(selectedTransaction)} transaction={selectedTransaction} onClose={() => { setSelectedTransaction(null); void loadTransactions(); }} /></DashboardLayout>;
 }

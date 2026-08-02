@@ -1,0 +1,132 @@
+"use client";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    ArrowDownLeft,
+    ArrowUpRight,
+    CircleAlert,
+    HandCoins,
+    Loader2,
+    Pencil,
+    Plus,
+    ReceiptText,
+    RefreshCw,
+    Scale,
+    Trash2,
+    UserPlus,
+    Users,
+    WalletCards,
+} from "lucide-react";
+import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
+import { BillDialog, FriendDialog, GroupDialog, SettlementDialog } from "@/app/components/dashboard/SplitDialogs";
+import {
+    apiErrorMessage,
+    SplitActivityItem,
+    SplitAPI,
+    SplitBalance,
+    SplitBill,
+    SplitFriend,
+    SplitGroup,
+    SplitSettlement,
+} from "@/app/lib/api";
+import { cn } from "@/app/lib/utils";
+
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });
+
+function ActivityIcon({ type }: { type: SplitActivityItem["type"] }) {
+    if (type === "bill") return <ReceiptText className="h-4 w-4" />;
+    if (type === "settlement") return <HandCoins className="h-4 w-4" />;
+    if (type === "group_created") return <Users className="h-4 w-4" />;
+    return <UserPlus className="h-4 w-4" />;
+}
+
+function BalanceCard({ balance, onSettle }: { balance: SplitBalance; onSettle: (friend: SplitFriend) => void }) {
+    const positive = balance.net_balance > 0;
+    const settled = balance.net_balance === 0;
+    return <article className="rounded-[1.75rem] border border-border bg-white p-5 dark:bg-zinc-900">
+        <div className="flex items-start gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent/10 font-bold text-accent">{balance.friend.name.slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><h3 className="truncate font-bold">{balance.friend.name}</h3><p className="mt-1 text-xs text-zinc-400">{balance.friend.email || balance.friend.phone || "Private contact"}</p></div></div>
+        <div className="mt-5 flex items-end justify-between border-t border-border pt-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">{settled ? "All settled" : positive ? "Owes you" : "You owe"}</p><p className={cn("mt-1 text-xl font-bold font-rounded", settled ? "text-zinc-400" : positive ? "text-emerald-600" : "text-amber-600")}>{currency.format(Math.abs(balance.net_balance))}</p></div>{!settled && <button onClick={() => onSettle(balance.friend)} className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-600 hover:bg-accent/10 hover:text-accent dark:bg-zinc-800">Settle</button>}</div>
+    </article>;
+}
+
+export default function SplitsScreen() {
+    const [friends, setFriends] = useState<SplitFriend[]>([]);
+    const [groups, setGroups] = useState<SplitGroup[]>([]);
+    const [bills, setBills] = useState<SplitBill[]>([]);
+    const [settlements, setSettlements] = useState<SplitSettlement[]>([]);
+    const [balances, setBalances] = useState<SplitBalance[]>([]);
+    const [activity, setActivity] = useState<SplitActivityItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [friendDialog, setFriendDialog] = useState<SplitFriend | null | undefined>(undefined);
+    const [groupDialog, setGroupDialog] = useState<SplitGroup | null | undefined>(undefined);
+    const [billDialog, setBillDialog] = useState<SplitBill | null | undefined>(undefined);
+    const [settlementFriend, setSettlementFriend] = useState<SplitFriend | null | undefined>(undefined);
+
+    const loadSplits = useCallback(async () => {
+        setLoading(true); setError("");
+        try {
+            const [friendResponse, groupResponse, billResponse, settlementResponse, balanceResponse, activityResponse] = await Promise.all([
+                SplitAPI.listFriends(), SplitAPI.listGroups(), SplitAPI.listBills(), SplitAPI.listSettlements(), SplitAPI.balances(), SplitAPI.activity(1, 30),
+            ]);
+            setFriends(friendResponse.data); setGroups(groupResponse.data); setBills(billResponse.data); setSettlements(settlementResponse.data); setBalances(balanceResponse.data); setActivity(activityResponse.data.items);
+        } catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t load your split ledger.")); }
+        finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { void loadSplits(); }, [loadSplits]);
+
+    const totals = useMemo(() => balances.reduce((summary, balance) => {
+        if (balance.net_balance > 0) summary.owedToYou += balance.net_balance;
+        if (balance.net_balance < 0) summary.youOwe += Math.abs(balance.net_balance);
+        return summary;
+    }, { owedToYou: 0, youOwe: 0 }), [balances]);
+
+    const closeAndReload = () => { setFriendDialog(undefined); setGroupDialog(undefined); setBillDialog(undefined); setSettlementFriend(undefined); void loadSplits(); };
+
+    const archiveFriend = async (friend: SplitFriend) => {
+        if (!window.confirm(`Archive ${friend.name}? Existing bills and balances remain in history.`)) return;
+        try { await SplitAPI.archiveFriend(friend.id); await loadSplits(); }
+        catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t archive this friend.")); }
+    };
+    const archiveGroup = async (group: SplitGroup) => {
+        if (!window.confirm(`Archive ${group.name}? Existing bills remain in history.`)) return;
+        try { await SplitAPI.archiveGroup(group.id); await loadSplits(); }
+        catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t archive this group.")); }
+    };
+    const deleteBill = async (bill: SplitBill) => {
+        if (!window.confirm(`Delete the split bill “${bill.title}”?`)) return;
+        try { await SplitAPI.deleteBill(bill.id); await loadSplits(); }
+        catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t delete this split bill.")); }
+    };
+
+    return <DashboardLayout><div className="space-y-7 pb-12">
+        <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">Shared expenses</p><h1 className="mt-2 text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Know exactly who owes whom.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Track friends, groups, shared bills, balances, and real settlements from one private ledger.</p></div><div className="flex flex-wrap gap-3"><button onClick={() => void loadSplits()} disabled={loading} className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-white text-zinc-500 disabled:opacity-50 dark:bg-zinc-900" aria-label="Refresh split ledger"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /></button><button onClick={() => setSettlementFriend(null)} disabled={!friends.length} className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-white px-5 text-sm font-bold text-zinc-600 disabled:opacity-40 dark:bg-zinc-900 dark:text-zinc-300"><HandCoins className="h-4 w-4" /> Record settlement</button><button onClick={() => setBillDialog(null)} disabled={!friends.length} className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-accent px-5 text-sm font-bold text-white shadow-lg shadow-accent/20 disabled:opacity-40"><Plus className="h-4 w-4" /> Add split bill</button></div></header>
+
+        {error && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><div className="flex-1"><p>{error}</p><button onClick={() => void loadSplits()} className="mt-2 font-bold underline">Try again</button></div></div>}
+
+        <section className="grid gap-4 md:grid-cols-3"><article className="rounded-[1.75rem] bg-zinc-950 p-6 text-white"><ArrowDownLeft className="h-5 w-5 text-emerald-400" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Owed to you</p><p className="mt-2 text-3xl font-bold font-rounded">{currency.format(totals.owedToYou)}</p></article><article className="rounded-[1.75rem] border border-border bg-white p-6 dark:bg-zinc-900"><ArrowUpRight className="h-5 w-5 text-amber-500" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">You owe</p><p className="mt-2 text-3xl font-bold font-rounded">{currency.format(totals.youOwe)}</p></article><article className="rounded-[1.75rem] border border-border bg-white p-6 dark:bg-zinc-900"><Scale className="h-5 w-5 text-accent" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Net position</p><p className="mt-2 text-3xl font-bold font-rounded">{currency.format(totals.owedToYou - totals.youOwe)}</p><p className="mt-2 text-xs text-zinc-400">Across {friends.length} active friend{friends.length === 1 ? "" : "s"}</p></article></section>
+
+        {loading ? <div className="grid min-h-80 place-items-center rounded-[2rem] border border-border bg-white dark:bg-zinc-900"><Loader2 className="h-7 w-7 animate-spin text-accent" /></div> : <>
+            <section><div className="mb-4 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Balances</p><h2 className="mt-1 text-2xl font-bold font-rounded">Settle without guesswork</h2></div></div>{balances.length === 0 ? <div className="rounded-[2rem] border border-dashed border-border p-10 text-center"><WalletCards className="mx-auto h-8 w-8 text-zinc-300" /><h3 className="mt-4 font-bold">No balances yet</h3><p className="mt-2 text-sm text-zinc-500">Add friends and record your first shared bill.</p></div> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{balances.map((balance) => <BalanceCard key={balance.friend.id} balance={balance} onSettle={(friend) => setSettlementFriend(friend)} />)}</div>}</section>
+
+            <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
+                <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Ledger</p><h2 className="mt-1 text-2xl font-bold font-rounded">Recent activity</h2></div><span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-500 dark:bg-zinc-800">{activity.length} shown</span></div>{activity.length === 0 ? <p className="mt-8 rounded-2xl bg-zinc-50 p-8 text-center text-sm text-zinc-400 dark:bg-zinc-800">Your split activity will appear here.</p> : <div className="mt-6 divide-y divide-border">{activity.map((item) => <article key={item.id} className="flex gap-4 py-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-accent/10 text-accent"><ActivityIcon type={item.type} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-bold">{item.title}</h3><p className="mt-1 text-xs text-zinc-400">{item.date}{item.participant_count ? ` · ${item.participant_count} friend${item.participant_count === 1 ? "" : "s"}` : ""}</p></div>{typeof item.amount === "number" && <p className="text-sm font-bold">{currency.format(item.amount)}</p>}</div>{item.notes && <p className="mt-2 text-xs leading-5 text-zinc-500">{item.notes}</p>}</div></article>)}</div>}</section>
+
+                <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">People</p><h2 className="mt-1 text-2xl font-bold font-rounded">Friends</h2></div><button onClick={() => setFriendDialog(null)} className="inline-flex items-center gap-2 rounded-xl bg-accent/10 px-3 py-2 text-xs font-bold text-accent"><UserPlus className="h-4 w-4" /> Add</button></div>{friends.length === 0 ? <p className="mt-6 rounded-2xl bg-zinc-50 p-6 text-center text-sm text-zinc-400 dark:bg-zinc-800">Add your first friend to start splitting.</p> : <div className="mt-5 space-y-2">{friends.map((friend) => <div key={friend.id} className="flex items-center gap-3 rounded-2xl border border-border p-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-zinc-100 text-xs font-bold dark:bg-zinc-800">{friend.name.slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{friend.name}</p><p className="truncate text-[11px] text-zinc-400">{friend.email || friend.phone || "No contact details"}</p></div><button onClick={() => setFriendDialog(friend)} className="rounded-lg p-2 text-zinc-400 hover:text-accent" aria-label={`Edit ${friend.name}`}><Pencil className="h-3.5 w-3.5" /></button><button onClick={() => void archiveFriend(friend)} className="rounded-lg p-2 text-zinc-400 hover:text-red-600" aria-label={`Archive ${friend.name}`}><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}</section>
+            </div>
+
+            <section className="grid gap-6 xl:grid-cols-2"><div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Circles</p><h2 className="mt-1 text-2xl font-bold font-rounded">Groups</h2></div><button onClick={() => setGroupDialog(null)} disabled={!friends.length} className="inline-flex items-center gap-2 rounded-xl bg-accent/10 px-3 py-2 text-xs font-bold text-accent disabled:opacity-40"><Plus className="h-4 w-4" /> Create</button></div>{groups.length === 0 ? <p className="mt-6 rounded-2xl bg-zinc-50 p-8 text-center text-sm text-zinc-400 dark:bg-zinc-800">No groups yet. Create one for trips, households, or regular crews.</p> : <div className="mt-5 grid gap-3 sm:grid-cols-2">{groups.map((group) => <article key={group.id} className="rounded-2xl border border-border p-4"><div className="flex items-start justify-between"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30"><Users className="h-4 w-4" /></span><div><button onClick={() => setGroupDialog(group)} className="rounded-lg p-2 text-zinc-400 hover:text-accent" aria-label={`Edit ${group.name}`}><Pencil className="h-3.5 w-3.5" /></button><button onClick={() => void archiveGroup(group)} className="rounded-lg p-2 text-zinc-400 hover:text-red-600" aria-label={`Archive ${group.name}`}><Trash2 className="h-3.5 w-3.5" /></button></div></div><h3 className="mt-4 font-bold">{group.name}</h3><p className="mt-1 text-xs text-zinc-400">{group.members?.map((member) => member.friend.name).join(", ") || "No members"}</p></article>)}</div>}</div>
+
+                <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Shared bills</p><h2 className="mt-1 text-2xl font-bold font-rounded">Bills</h2></div><span className="text-xs font-bold text-zinc-400">{bills.length} total</span></div>{bills.length === 0 ? <p className="mt-6 rounded-2xl bg-zinc-50 p-8 text-center text-sm text-zinc-400 dark:bg-zinc-800">No split bills recorded.</p> : <div className="mt-5 divide-y divide-border">{bills.slice(0, 8).map((bill) => <article key={bill.id} className="flex items-center gap-3 py-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30"><ReceiptText className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{bill.title}</p><p className="mt-1 text-xs text-zinc-400">{bill.date} · {bill.participants.length} share{bill.participants.length === 1 ? "" : "s"}{bill.group ? ` · ${bill.group.name}` : ""}</p></div><p className="text-sm font-bold">{currency.format(bill.total_amount)}</p><button onClick={() => setBillDialog(bill)} className="rounded-lg p-2 text-zinc-400 hover:text-accent" aria-label={`Edit ${bill.title}`}><Pencil className="h-3.5 w-3.5" /></button><button onClick={() => void deleteBill(bill)} className="rounded-lg p-2 text-zinc-400 hover:text-red-600" aria-label={`Delete ${bill.title}`}><Trash2 className="h-3.5 w-3.5" /></button></article>)}</div>}</div>
+            </section>
+
+            <aside className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /><p>Balances are calculated from recorded split shares and {settlements.length} settlement{settlements.length === 1 ? "" : "s"}. FINNRI does not move money or notify friends.</p></aside>
+        </>}
+    </div>
+    {friendDialog !== undefined && <FriendDialog friend={friendDialog || undefined} onClose={() => setFriendDialog(undefined)} onSaved={closeAndReload} />}
+    {groupDialog !== undefined && <GroupDialog group={groupDialog || undefined} friends={friends} onClose={() => setGroupDialog(undefined)} onSaved={closeAndReload} />}
+    {billDialog !== undefined && <BillDialog bill={billDialog || undefined} friends={friends} groups={groups} onClose={() => setBillDialog(undefined)} onSaved={closeAndReload} />}
+    {settlementFriend !== undefined && <SettlementDialog friends={friends} suggestedFriend={settlementFriend || undefined} onClose={() => setSettlementFriend(undefined)} onSaved={closeAndReload} />}
+    </DashboardLayout>;
+}

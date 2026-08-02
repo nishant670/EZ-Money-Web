@@ -17,7 +17,6 @@ import {
   Smartphone,
   Menu,
   X,
-  Plus,
   ArrowDownRight,
   ChevronDown
 } from "lucide-react";
@@ -40,10 +39,9 @@ export default function Home() {
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-morphism py-3 shadow-sm" : "bg-transparent py-5"}`}>
         <div className="container mx-auto px-6 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 relative bg-accent rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-accent/20">
-              <Image src="/logo.png" alt="Finnri Logo" fill className="p-1 object-contain" />
+            <div className="relative flex h-11 w-28 items-center justify-center overflow-hidden rounded-xl bg-zinc-950 shadow-lg shadow-zinc-950/15">
+              <Image src="/finnri-logo.png" alt="Finnri" fill sizes="112px" className="scale-[2.35] object-contain" priority />
             </div>
-            <span className="text-xl font-bold tracking-tight font-rounded">Finnri</span>
           </Link>
 
           {/* Desktop Nav */}
@@ -208,8 +206,8 @@ export default function Home() {
               },
               {
                 icon: <Wallet className="w-6 h-6" />,
-                title: "Multi-Account Sync",
-                desc: "Track Bank, Wallets, UPI, and Credit Cards in one place."
+                title: "Multi-Account Tracking",
+                desc: "Organize cash, bank, wallet, UPI, and card spending in one place."
               },
               {
                 icon: <TrendingUp className="w-6 h-6" />,
@@ -224,7 +222,7 @@ export default function Home() {
               {
                 icon: <LayoutDashboard className="w-6 h-6" />,
                 title: "Web Dashboard",
-                desc: "Deep analysis and bulk editing on the big screen."
+                desc: "Review explainable insights, accounts, transactions, and planning tools on the big screen."
               }
             ].map((feature, i) => (
               <div key={i} className="p-8 rounded-[2rem] border border-border hover:border-accent/40 bg-white/50 dark:bg-zinc-800/50 hover:bg-white dark:hover:bg-zinc-800 transition-all">
@@ -292,8 +290,8 @@ export default function Home() {
               {/* Decorative dots */}
               {[...Array(20)].map((_, i) => (
                 <div key={i} className="absolute w-1 h-1 bg-white/20 rounded-full" style={{
-                  top: `${Math.random() * 100}%`,
-                  left: `${Math.random() * 100}%`
+                  top: `${(i * 37 + 11) % 100}%`,
+                  left: `${(i * 61 + 7) % 100}%`
                 }} />
               ))}
             </div>
@@ -309,7 +307,7 @@ export default function Home() {
               <div>
                 <h2 className="text-3xl lg:text-4xl font-bold mb-6 font-rounded">Analyze on the big screen.</h2>
                 <p className="text-text-muted text-lg mb-8 leading-relaxed">
-                  Some things are better seen on a larger canvas. Use the Web Dashboard for deep dives, bulk management, and professional summaries.
+                  Some things are better seen on a larger canvas. Use the Web Dashboard to understand patterns, review records, and plan with context.
                 </p>
                 <ul className="space-y-4 mb-10 text-lg font-medium">
                   <li className="flex items-center gap-3">
@@ -318,11 +316,11 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center text-white"><CheckCircle2 className="w-4 h-4" /></div>
-                    Bulk edit or categorize historical transactions
+                    Search, filter, inspect, and export transaction views
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center text-white"><CheckCircle2 className="w-4 h-4" /></div>
-                    Export data for accounting or tax purposes
+                    Use budgets, recurring-payment reviews, and EMI tools
                   </li>
                 </ul>
                 <Link href="/login" className="inline-flex items-center gap-2 bg-accent text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-accent/20 hover:scale-105 transition-transform">
@@ -420,7 +418,7 @@ export default function Home() {
                 <div className="flex gap-1 mb-4">
                   {[...Array(5)].map((_, j) => <CheckCircle2 key={j} className="w-4 h-4 text-accent fill-accent" />)}
                 </div>
-                <p className="italic text-text-muted mb-6">"{t.quote}"</p>
+                <p className="italic text-text-muted mb-6">&ldquo;{t.quote}&rdquo;</p>
                 <div>
                   <p className="font-bold font-rounded">{t.name}</p>
                   <p className="text-xs text-text-muted">{t.role}</p>
@@ -575,10 +573,9 @@ export default function Home() {
         <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 relative bg-accent rounded-lg flex items-center justify-center shadow-lg shadow-accent/20">
-                <Image src="/logo.png" alt="Finnri Logo" fill className="p-1 object-contain" />
+              <div className="relative flex h-10 w-24 items-center justify-center overflow-hidden rounded-xl bg-zinc-950 shadow-lg shadow-zinc-950/15">
+                <Image src="/finnri-logo.png" alt="Finnri" fill sizes="96px" className="scale-[2.35] object-contain" />
               </div>
-              <span className="text-lg font-bold font-rounded">Finnri</span>
             </div>
 
             <div className="flex flex-wrap justify-center gap-8 text-sm font-medium text-text-muted">

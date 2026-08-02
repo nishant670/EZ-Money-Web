@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     X,
-    Mic,
     Info,
     Plus,
     Check,
@@ -18,7 +17,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { EntriesAPI } from "@/app/lib/api";
+import { Account, AccountsAPI, apiErrorMessage, EntriesAPI, EntrySplitInput, SplitAPI, SplitFriend, SplitGroup } from "@/app/lib/api";
+import InlineSplitEditor from "@/app/components/dashboard/InlineSplitEditor";
 
 interface AddTransactionModalProps {
     isOpen: boolean;
@@ -37,11 +37,32 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
     const [amount, setAmount] = useState("");
     const [title, setTitle] = useState("");
     const [category, setCategory] = useState("Food & Drinks");
-    const [date, setDate] = useState("");
-    const [account, setAccount] = useState("Cash");
+    const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16));
+    const [accountID, setAccountID] = useState<number | "">("");
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [splitFriends, setSplitFriends] = useState<SplitFriend[]>([]);
+    const [splitGroups, setSplitGroups] = useState<SplitGroup[]>([]);
+    const [entrySplit, setEntrySplit] = useState<EntrySplitInput | null>(null);
     const [tags, setTags] = useState<string[]>([]);
     const [newTag, setNewTag] = useState("");
     const [showTagInput, setShowTagInput] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let active = true;
+        Promise.allSettled([AccountsAPI.list(), SplitAPI.listFriends(), SplitAPI.listGroups()]).then(([accountsResult, friendsResult, groupsResult]) => {
+            if (!active) return;
+            if (accountsResult.status === "fulfilled") {
+                setAccounts(accountsResult.value.data);
+                const preferred = accountsResult.value.data.find((item) => item.is_default) || accountsResult.value.data[0];
+                setAccountID((current) => current || preferred?.id || "");
+            } else setError(apiErrorMessage(accountsResult.reason, "We couldn’t load your accounts."));
+            if (friendsResult.status === "fulfilled") setSplitFriends(friendsResult.value.data);
+            if (groupsResult.status === "fulfilled") setSplitGroups(groupsResult.value.data);
+        });
+        return () => { active = false; };
+    }, [isOpen]);
 
     const resetForm = () => {
         setText("");
@@ -50,10 +71,12 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
         setTitle("");
         setCategory("Food & Drinks");
         setDate(new Date().toISOString().slice(0, 16));
-        setAccount("Cash");
+        setAccountID("");
         setTags([]);
+        setEntrySplit(null);
         setMode("quick");
         setSuccess(false);
+        setError("");
     };
 
     const handleExtract = async () => {
@@ -71,16 +94,19 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
             if (data) {
                 if (data.type) setType(data.type as "expense" | "income");
                 if (data.amount) setAmount(data.amount.toString());
-                if (data.title || data.merchant) setTitle(data.merchant || data.title);
+                if (data.title || data.merchant) setTitle(data.merchant || data.title || "");
                 if (data.category) setCategory(data.category);
                 if (data.date) setDate(data.date + (data.time ? "T" + data.time : "T12:00")); // Rough iso conversion
-                if (data.mode) setAccount(data.mode);
+                if (data.account_hint || data.mode) {
+                    const hint = (data.account_hint || data.mode || "").toLowerCase();
+                    const match = accounts.find((item) => item.name.toLowerCase().includes(hint) || item.type.replace("_", " ").includes(hint));
+                    if (match) setAccountID(match.id);
+                }
                 if (data.tags) setTags(data.tags);
             }
             setMode("manual");
-        } catch (err) {
-            console.error("AI Extraction failed", err);
-            // Fallback to manual without data
+        } catch (requestError) {
+            setError(apiErrorMessage(requestError, "AI extraction is unavailable. You can still enter the transaction manually."));
             setMode("manual");
         } finally {
             setExtracting(false);
@@ -88,28 +114,44 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
     };
 
     const handleSave = async () => {
-        if (!amount || !title) return; // Basic validation
+        if (!amount || !title || !accountID) {
+            setError("Amount, merchant, and account are required.");
+            return;
+        }
+        const numericAmount = parseFloat(amount);
+        if (entrySplit) {
+            const invalidParticipant = entrySplit.participants.some((participant) => !participant.friend_id || participant.share_amount <= 0);
+            const totalShares = entrySplit.participants.reduce((sum, participant) => sum + Number(participant.share_amount || 0), 0);
+            if (invalidParticipant) { setError("Choose a friend and positive share for every split participant."); return; }
+            if (totalShares > numericAmount) { setError("Friend shares cannot exceed the transaction amount."); return; }
+        }
         setSaving(true);
+        setError("");
         try {
+            const selectedAccount = accounts.find((item) => item.id === accountID);
+            const entryMode = selectedAccount?.type === "upi" ? "UPI" : selectedAccount?.type === "credit_card" || selectedAccount?.type === "debit_card" || selectedAccount?.type === "bank" ? "Credit Card" : selectedAccount?.type === "wallet" ? "Wallets" : "Cash";
             await EntriesAPI.create({
                 type,
-                amount: parseFloat(amount),
+                amount: numericAmount,
+                currency: "INR",
+                source: text.trim() ? "text" : "manual",
                 title, // or merchant
                 merchant: title,
                 category,
                 date: date.split("T")[0],
                 time: date.split("T")[1] || "00:00:00",
-                mode: account,
+                mode: entryMode,
+                account_id: accountID,
                 tags,
-                status: "confirmed"
+                split: type === "expense" ? entrySplit || undefined : undefined,
             });
             setSuccess(true);
             setTimeout(() => {
                 onClose();
                 resetForm();
             }, 1000);
-        } catch (err) {
-            console.error("Failed to save transaction", err);
+        } catch (requestError) {
+            setError(apiErrorMessage(requestError, "We couldn’t save this transaction."));
         } finally {
             setSaving(false);
         }
@@ -232,7 +274,7 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
                                                     Expense
                                                 </button>
                                                 <button
-                                                    onClick={() => setType("income")}
+                                                    onClick={() => { setType("income"); setEntrySplit(null); }}
                                                     className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", type === "income" ? "bg-white dark:bg-zinc-700 text-green-500 shadow-sm" : "text-zinc-400")}
                                                 >
                                                     Income
@@ -305,18 +347,18 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
                                             <div className="relative">
                                                 <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                                                 <select
-                                                    value={account}
-                                                    onChange={(e) => setAccount(e.target.value)}
+                                                    value={accountID}
+                                                    onChange={(e) => setAccountID(Number(e.target.value))}
                                                     className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20"
                                                 >
-                                                    <option>Cash</option>
-                                                    <option>Card</option>
-                                                    <option>UPI</option>
-                                                    <option>Bank Transfer</option>
+                                                    <option value="" disabled>Select an account</option>
+                                                    {accounts.map((item) => <option key={item.id} value={item.id}>{item.name}{item.is_default ? " (Default)" : ""}</option>)}
                                                 </select>
                                             </div>
                                         </div>
                                     </div>
+
+                                    {type === "expense" && <InlineSplitEditor amount={Number(amount || 0)} friends={splitFriends} groups={splitGroups} value={entrySplit} onChange={setEntrySplit} />}
 
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Tags</label>
@@ -350,13 +392,15 @@ export default function AddTransactionModal({ isOpen, onClose }: AddTransactionM
                             )}
                         </div>
 
+                        {error && <p className="mx-8 mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950/30">{error}</p>}
+
                         {/* Footer */}
                         <div className="p-8 border-t border-border bg-zinc-50 dark:bg-zinc-800/50 flex justify-between items-center sticky bottom-0 z-10">
                             <button onClick={onClose} className="px-6 py-3 text-sm font-bold text-zinc-400 hover:text-zinc-900 transition-colors">Cancel</button>
                             <div className="flex gap-4">
                                 <button
                                     onClick={handleSave}
-                                    disabled={saving}
+                                    disabled={saving || mode === "quick" || !accountID}
                                     className={cn(
                                         "group flex items-center justify-center gap-2 px-10 py-3 bg-accent text-white rounded-xl font-bold text-sm shadow-xl shadow-accent/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-70",
                                         success && "bg-green-500 shadow-green-500/20"

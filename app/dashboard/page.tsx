@@ -1,347 +1,154 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
-    TrendingUp,
-    TrendingDown,
-    Wallet,
-    AlertCircle,
-    Plus,
+    ArrowRight,
     ArrowUpRight,
-    CheckCircle2,
-    Info
+    CalendarDays,
+    CircleAlert,
+    IndianRupee,
+    Lightbulb,
+    ListChecks,
+    Loader2,
+    Plus,
+    RefreshCw,
+    Sparkles,
+    TrendingDown,
+    TrendingUp,
+    WalletCards,
 } from "lucide-react";
-import {
-    AreaChart,
-    Area,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    PieChart,
-    Pie,
-    Cell
-} from "recharts";
-import { cn } from "@/app/lib/utils";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
 import AddTransactionModal from "@/app/components/dashboard/AddTransactionModal";
 import TransactionDetailsDrawer from "@/app/components/dashboard/TransactionDetailsDrawer";
-import { EntriesAPI, Transaction } from "@/app/lib/api";
+import { apiErrorMessage, DashboardAPI, DashboardResponse, Transaction } from "@/app/lib/api";
+import { cn } from "@/app/lib/utils";
 
-const COLORS = ["#FF8865", "#FFB09C", "#FFE8E5", "#2D2D2D", "#F0E5E7"];
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+
+function isoDate(date: Date) {
+    const offset = date.getTimezoneOffset();
+    return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
+function rangeFor(preset: "month" | "30d" | "90d") {
+    const end = new Date();
+    const start = new Date(end);
+    if (preset === "month") start.setDate(1);
+    if (preset === "30d") start.setDate(end.getDate() - 29);
+    if (preset === "90d") start.setDate(end.getDate() - 89);
+    return { start_date: isoDate(start), end_date: isoDate(end), tz: Intl.DateTimeFormat().resolvedOptions().timeZone };
+}
+
+function EmptyState({ onAdd }: { onAdd: () => void }) {
+    return (
+        <div className="rounded-[2rem] border border-dashed border-accent/30 bg-gradient-to-br from-white to-accent/5 p-10 text-center dark:from-zinc-900 dark:to-accent/5">
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent/10 text-accent"><Sparkles className="h-6 w-6" /></span>
+            <h2 className="mt-5 text-xl font-bold font-rounded">Your first insight starts with one transaction</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">Add an expense or income. Finnri will turn it into category, account, merchant, and period-level insight automatically.</p>
+            <button onClick={onAdd} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-white shadow-lg shadow-accent/20"><Plus className="h-4 w-4" /> Add a transaction</button>
+        </div>
+    );
+}
 
 export default function DashboardHome() {
+    const [preset, setPreset] = useState<"month" | "30d" | "90d">("month");
+    const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [selectedTxn, setSelectedTxn] = useState<any>(null);
+    const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    // Derived State
-    const [summary, setSummary] = useState({
-        income: 0,
-        expense: 0,
-        savings: 0
-    });
-    const [chartData, setChartData] = useState<{ name: string, income: number, expense: number }[]>([]);
-    const [categoryData, setCategoryData] = useState<{ name: string, value: number, color: string }[]>([]);
-    const [reviewItems, setReviewItems] = useState<Transaction[]>([]);
-
-    useEffect(() => {
-        fetchData();
-    }, [isModalOpen, isDrawerOpen]); // Refresh when modal/drawer closes (naive invalidation)
-
-    const fetchData = async () => {
+    const loadDashboard = useCallback(async () => {
+        setLoading(true);
+        setError("");
         try {
-            const res = await EntriesAPI.list();
-            const txns = res.data;
-            setTransactions(txns);
-            processData(txns);
-        } catch (err) {
-            console.error("Failed to fetch dashboard data", err);
+            const response = await DashboardAPI.get(rangeFor(preset));
+            setDashboard(response.data);
+        } catch (requestError) {
+            setError(apiErrorMessage(requestError, "We couldn’t load your dashboard. Check that the FINNRI API is running, then try again."));
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
-    };
+    }, [preset]);
 
-    const processData = (txns: Transaction[]) => {
-        // 1. Summary
-        let inc = 0, exp = 0;
-        txns.forEach(t => {
-            if (t.type === 'income') inc += t.amount;
-            if (t.type === 'expense') exp += t.amount;
-        });
-        setSummary({ income: inc, expense: exp, savings: inc - exp });
+    useEffect(() => { void loadDashboard(); }, [loadDashboard]);
 
-        // 2. Chart Data (Group by Date - Last 7 unique dates or last 7 days)
-        // Simple aggregation by date string
-        const daysMap = new Map<string, { income: number, expense: number }>();
-        txns.forEach(t => {
-            // Parse date to "DD MMM"
-            const dateObj = new Date(t.date);
-            const key = dateObj.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
-
-            if (!daysMap.has(key)) daysMap.set(key, { income: 0, expense: 0 });
-            const curr = daysMap.get(key)!;
-            if (t.type === 'income') curr.income += t.amount;
-            if (t.type === 'expense') curr.expense += t.amount;
-        });
-        // Sort and take top 7
-        const chart = Array.from(daysMap.entries())
-            .map(([name, val]) => ({ name, ...val }))
-            .slice(-7)
-            .reverse();
-        setChartData(chart);
-
-        // 3. Category Data
-        const catMap = new Map<string, number>();
-        txns.filter(t => t.type === 'expense').forEach(t => {
-            catMap.set(t.category, (catMap.get(t.category) || 0) + t.amount);
-        });
-        const cat = Array.from(catMap.entries())
-            .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 5);
-        setCategoryData(cat);
-
-        // 4. Review Items (Pending status)
-        setReviewItems(txns.filter(t => t.status === "pending").slice(0, 3));
-    };
-
-    const openDrawer = (txn: Transaction) => {
-        setSelectedTxn(txn);
-        setIsDrawerOpen(true);
-    };
-
-    if (isLoading) {
-        return (
-            <DashboardLayout>
-                <div className="flex h-[80vh] items-center justify-center">
-                    <div className="animate-pulse text-zinc-300 font-bold text-xl">Loading your finances...</div>
-                </div>
-            </DashboardLayout>
-        );
-    }
+    const net = (dashboard?.summary.total_income || 0) - (dashboard?.summary.total_spent || 0);
+    const topInsight = dashboard?.insights.find((item) => item.severity === "warning") || dashboard?.insights[0];
+    const hasData = Boolean(dashboard?.summary.transaction_count);
+    const chartData = useMemo(() => dashboard?.top_categories.map((item) => ({ name: item.category, amount: item.amount })) || [], [dashboard]);
 
     return (
         <DashboardLayout>
-            <div className="space-y-10 animate-in fade-in duration-700">
-                {/* Top Section: Header + CTA */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold font-rounded tracking-tight dark:text-white">Overview</h1>
-                        <p className="text-zinc-500 text-sm font-medium mt-1">Here's what's happening with your money this month.</p>
+            <div className="space-y-7 pb-12">
+                <section className="relative overflow-hidden rounded-[2rem] bg-zinc-950 p-6 text-white shadow-2xl shadow-zinc-900/10 sm:p-8 lg:p-10">
+                    <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-accent/25 blur-3xl" />
+                    <div className="relative flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+                        <div className="max-w-2xl">
+                            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/70"><CalendarDays className="h-3.5 w-3.5 text-accent" /> {dashboard ? `${dashboard.period.start} — ${dashboard.period.end}` : "Your money, in context"}</div>
+                            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">Financial overview</p>
+                            <h1 className="mt-3 max-w-xl text-3xl font-bold tracking-tight font-rounded sm:text-4xl lg:text-5xl">See what changed, then decide what matters.</h1>
+                            <p className="mt-4 max-w-xl text-sm leading-6 text-zinc-400 sm:text-base">Live totals, grounded insights, recurring patterns, and planning tools—built from your confirmed FINNRI data.</p>
+                        </div>
+                        <button onClick={() => setIsModalOpen(true)} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-accent px-6 py-3 text-sm font-bold text-white shadow-xl shadow-accent/20 hover:bg-[#ff7953]"><Plus className="h-5 w-5" /> Add transaction</button>
                     </div>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 bg-accent text-white px-6 py-3 rounded-2xl font-bold shadow-xl shadow-accent/20 hover:scale-105 transition-all"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Add Transaction
-                    </button>
+                </section>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex w-fit rounded-xl border border-border bg-white p-1 dark:bg-zinc-900" aria-label="Dashboard period">
+                        {([['month', 'This month'], ['30d', '30 days'], ['90d', '90 days']] as const).map(([value, label]) => (
+                            <button key={value} onClick={() => setPreset(value)} className={cn("min-h-10 rounded-lg px-4 text-xs font-bold transition", preset === value ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900" : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white")}>{label}</button>
+                        ))}
+                    </div>
+                    <button onClick={() => void loadDashboard()} className="inline-flex min-h-11 items-center gap-2 self-start rounded-xl px-3 text-xs font-bold text-zinc-500 hover:bg-white dark:hover:bg-zinc-900"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> Refresh</button>
                 </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                        { label: "Total Spent", amount: `₹${summary.expense.toLocaleString()}`, trend: "This Month", icon: TrendingUp, color: "text-red-500", bg: "bg-red-500/10" },
-                        { label: "Total Income", amount: `₹${summary.income.toLocaleString()}`, trend: "This Month", icon: TrendingDown, color: "text-green-500", bg: "bg-green-500/10" },
-                        { label: "Net Savings", amount: `₹${summary.savings.toLocaleString()}`, trend: "This Month", icon: Wallet, color: "text-accent", bg: "bg-accent/10" },
-                    ].map((card, i) => (
-                        <div key={i} className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-border shadow-sm hover:shadow-xl transition-all group">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className={cn("p-3 rounded-2xl", card.bg, card.color)}>
-                                    <card.icon className="w-6 h-6" />
-                                </div>
-                                <div className={cn("text-xs font-bold px-2.5 py-1 rounded-full", card.bg, card.color)}>
-                                    {card.trend}
-                                </div>
-                            </div>
-                            <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest">{card.label}</p>
-                            <h3 className="text-3xl font-bold mt-2 font-rounded group-hover:scale-105 transition-transform origin-left">{card.amount}</h3>
-                        </div>
-                    ))}
-                </div>
+                {loading ? (
+                    <div className="grid min-h-[420px] place-items-center rounded-[2rem] border border-border bg-white dark:bg-zinc-900"><div className="text-center text-zinc-400"><Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-accent" /><p className="text-sm font-semibold">Calculating your latest view…</p></div></div>
+                ) : error ? (
+                    <div className="rounded-[2rem] border border-red-200 bg-red-50 p-8 dark:border-red-900/40 dark:bg-red-950/20"><CircleAlert className="h-6 w-6 text-red-500" /><h2 className="mt-4 text-lg font-bold">Dashboard unavailable</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-red-700/70 dark:text-red-300/70">{error}</p><button onClick={() => void loadDashboard()} className="mt-5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white">Try again</button></div>
+                ) : !hasData ? <EmptyState onAdd={() => setIsModalOpen(true)} /> : dashboard && (
+                    <>
+                        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            {[
+                                { label: "Spent", value: currency.format(dashboard.summary.total_spent), detail: `${dashboard.summary.transaction_count} transactions`, icon: TrendingDown, tone: "text-rose-600 bg-rose-50 dark:bg-rose-950/30" },
+                                { label: "Income", value: currency.format(dashboard.summary.total_income), detail: "Confirmed income", icon: TrendingUp, tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
+                                { label: "Net cash flow", value: currency.format(net), detail: net >= 0 ? "Positive for this period" : "Spending is above income", icon: WalletCards, tone: "text-accent bg-accent/10" },
+                                { label: "Daily average", value: currency.format(dashboard.summary.daily_average), detail: "Expense pace", icon: IndianRupee, tone: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30" },
+                            ].map((card) => <article key={card.label} className="rounded-[1.75rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900"><div className={cn("grid h-11 w-11 place-items-center rounded-2xl", card.tone)}><card.icon className="h-5 w-5" /></div><p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">{card.label}</p><p className="mt-2 text-2xl font-bold tracking-tight font-rounded">{card.value}</p><p className="mt-1 text-xs text-zinc-500">{card.detail}</p></article>)}
+                        </section>
 
-                {/* Charts Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Spend Trend */}
-                    <div className="lg:col-span-2 bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-border shadow-sm">
-                        <div className="flex items-center justify-between mb-8">
-                            <h3 className="text-xl font-bold font-rounded">Spending Trends</h3>
-                            <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-zinc-400 underline decoration-2 underline-offset-4 decoration-accent/20">
-                                Last 7 Days
-                            </div>
-                        </div>
-                        <div className="h-[350px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#FF8865" stopOpacity={0.1} />
-                                            <stop offset="95%" stopColor="#FF8865" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 11, fontWeight: 500, fill: '#A0A0A0' }}
-                                        dy={10}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 11, fontWeight: 500, fill: '#A0A0A0' }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)' }}
-                                    />
-                                    <Area type="monotone" dataKey="income" stroke="#FF8865" strokeWidth={3} fillOpacity={1} fill="url(#colorIncome)" />
-                                    <Area type="monotone" dataKey="expense" stroke="#2D2D2D" strokeWidth={3} fill="transparent" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    {/* Category Breakdown */}
-                    <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-border shadow-sm flex flex-col">
-                        <h3 className="text-xl font-bold font-rounded mb-8">Top Categories</h3>
-                        {categoryData.length > 0 ? (
-                            <>
-                                <div className="h-[250px] w-full relative">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={categoryData}
-                                                innerRadius={80}
-                                                outerRadius={100}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {categoryData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                        <p className="text-xs font-bold text-zinc-400">Expenses</p>
-                                        <p className="text-2xl font-bold font-rounded">₹{summary.expense.toLocaleString()}</p>
-                                    </div>
-                                </div>
-                                <div className="mt-8 space-y-3 flex-1 overflow-y-auto pr-2">
-                                    {categoryData.map((item, i) => (
-                                        <div key={i} className="flex items-center justify-between group cursor-pointer">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                                                <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 transition-colors">{item.name}</span>
-                                            </div>
-                                            <span className="text-sm font-bold">₹{item.value.toLocaleString()}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center text-zinc-400 text-sm">No expense data</div>
+                        {topInsight && (
+                            <section className="grid gap-6 overflow-hidden rounded-[2rem] border border-accent/20 bg-gradient-to-r from-accent/10 via-white to-white p-6 dark:via-zinc-900 dark:to-zinc-900 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+                                <div className="flex items-start gap-4"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-accent text-white"><Lightbulb className="h-5 w-5" /></span><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Worth noticing</p><h2 className="mt-2 text-xl font-bold font-rounded">{topInsight.title}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">{topInsight.body}</p></div></div>
+                                <Link href="/dashboard/insights" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-accent/20 bg-white px-5 text-sm font-bold text-accent dark:bg-zinc-950">Explore all insights <ArrowRight className="h-4 w-4" /></Link>
+                            </section>
                         )}
-                    </div>
-                </div>
 
-                {/* Bottom Section: To Review & Recent */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* To Review */}
-                    <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-border shadow-sm">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-xl font-bold font-rounded">Review Required</h3>
-                                <span className="bg-accent/10 text-accent text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">{reviewItems.length} Items</span>
-                            </div>
-                            <button className="text-xs font-bold text-accent hover:underline">View All</button>
-                        </div>
-
-                        {reviewItems.length > 0 ? (
-                            <div className="space-y-4">
-                                {reviewItems.map((item, i) => (
-                                    <div
-                                        key={item.ID}
-                                        onClick={() => openDrawer(item)}
-                                        className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl group hover:bg-white border border-transparent hover:border-border transition-all cursor-pointer"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-500">
-                                                <AlertCircle className="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold group-hover:text-accent transition-colors">{item.merchant || "Unknown Merchant"}</p>
-                                                <p className="text-xs text-zinc-500">{item.title || "Review Needed"}</p>
-                                            </div>
-                                        </div>
-                                        <ArrowUpRight className="w-4 h-4 text-zinc-300 group-hover:text-accent group-hover:translate-x-1 group-hover:-translate-y-1 transition-all" />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="py-10 text-center text-zinc-400 text-sm">All caught up! No reviews pending.</div>
-                        )}
-                    </div>
-
-                    {/* Recent Transactions */}
-                    <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-border shadow-sm">
-                        <div className="flex items-center justify-between mb-8">
-                            <h3 className="text-xl font-bold font-rounded">Recent Transactions</h3>
-                            <button className="text-xs font-bold text-accent hover:underline">Full Statement</button>
-                        </div>
-
-                        <div className="space-y-6">
-                            {transactions.slice(0, 5).map((t, i) => (
-                                <div
-                                    key={t.ID}
-                                    onClick={() => openDrawer(t)}
-                                    className="flex items-center justify-between group cursor-pointer"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center font-bold text-zinc-400 group-hover:text-accent group-hover:bg-accent/10 transition-all shadow-sm">
-                                            {t.merchant ? t.merchant[0] : (t.title ? t.title[0] : '?')}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold dark:text-white">{t.merchant || t.title}</p>
-                                            <p className="text-xs text-zinc-500 font-medium">{t.category} • {t.date}</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className={cn("text-sm font-bold", t.type === 'income' ? "text-green-500" : "text-zinc-900 dark:text-white")}>
-                                            {t.type === 'income' ? '+' : '-'}₹{t.amount}
-                                        </p>
-                                        {t.status === "confirmed" ? (
-                                            <div className="flex items-center justify-end gap-1 text-[10px] text-green-500 font-bold uppercase tracking-widest mt-0.5">
-                                                <CheckCircle2 className="w-3 h-3" />
-                                                Confirmed
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center justify-end gap-1 text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
-                                                <Info className="w-3 h-3" />
-                                                Pending AI
-                                            </div>
-                                        )}
-                                    </div>
+                        <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+                            <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
+                                <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">Spending mix</p><h2 className="mt-2 text-xl font-bold font-rounded">Top categories</h2></div>
+                                <div className="mt-7 h-[300px] min-w-0">
+                                    <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} layout="vertical" margin={{ left: 4, right: 8 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" /><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#71717a" }} /><Tooltip formatter={(value) => currency.format(Number(value))} cursor={{ fill: "rgba(255,136,101,.06)" }} contentStyle={{ borderRadius: 16, border: "1px solid #f0e5e7" }} /><Bar dataKey="amount" fill="#FF8865" radius={[0, 8, 8, 0]} barSize={24} /></BarChart></ResponsiveContainer>
                                 </div>
-                            ))}
-                            {transactions.length === 0 && (
-                                <div className="py-10 text-center text-zinc-400 text-sm">No transactions found. Adding one!</div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                            </div>
+                            <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
+                                <div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">Where it went</p><h2 className="mt-2 text-xl font-bold font-rounded">Top merchants</h2></div><ListChecks className="h-5 w-5 text-accent" /></div>
+                                <div className="mt-6 space-y-2">{dashboard.top_merchants.length ? dashboard.top_merchants.map((merchant, index) => <div key={merchant.merchant} className="flex items-center gap-3 rounded-2xl p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800"><span className="grid h-9 w-9 place-items-center rounded-xl bg-zinc-100 text-xs font-bold text-zinc-500 dark:bg-zinc-800">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{merchant.merchant}</p><p className="text-xs text-zinc-400">{merchant.transaction_count} transaction{merchant.transaction_count === 1 ? "" : "s"}</p></div><p className="text-sm font-bold">{currency.format(merchant.amount)}</p></div>) : <p className="py-12 text-center text-sm text-zinc-400">Merchant details will appear here.</p>}</div>
+                            </div>
+                        </section>
 
-                {/* Modals & Drawers */}
-                <AddTransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-                <TransactionDetailsDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} transaction={selectedTxn} />
+                        <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
+                            <div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">Latest activity</p><h2 className="mt-2 text-xl font-bold font-rounded">Recent transactions</h2></div><Link href="/dashboard/transactions" className="inline-flex items-center gap-1 text-xs font-bold text-accent">View all <ArrowUpRight className="h-4 w-4" /></Link></div>
+                            <div className="mt-6 divide-y divide-border">{dashboard.recent_transactions.map((transaction) => <button key={transaction.id} onClick={() => setSelectedTransaction(transaction)} className="flex min-h-16 w-full items-center gap-4 py-3 text-left"><span className="grid h-10 w-10 place-items-center rounded-xl bg-zinc-100 text-sm font-bold text-zinc-500 dark:bg-zinc-800">{(transaction.merchant || transaction.title || "?").slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{transaction.merchant || transaction.title}</p><p className="truncate text-xs text-zinc-400">{transaction.category} · {transaction.account?.name || transaction.mode}</p></div><div className="text-right"><p className={cn("text-sm font-bold", transaction.type === "income" ? "text-emerald-600" : "text-zinc-900 dark:text-white")}>{transaction.type === "income" ? "+" : "−"}{currency.format(transaction.amount)}</p><p className="text-xs text-zinc-400">{transaction.date}</p></div></button>)}</div>
+                        </section>
+                    </>
+                )}
             </div>
+            <AddTransactionModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); void loadDashboard(); }} />
+            <TransactionDetailsDrawer isOpen={Boolean(selectedTransaction)} onClose={() => { setSelectedTransaction(null); void loadDashboard(); }} transaction={selectedTransaction} />
         </DashboardLayout>
     );
 }

@@ -1,177 +1,125 @@
 "use client";
 
-import React from "react";
-import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
+import React, { FormEvent, useCallback, useEffect, useState } from "react";
 import {
-    Plus,
-    CreditCard,
+    Banknote,
     Building2,
-    Wallet as WalletIcon,
-    Smartphone,
-    MoreVertical,
-    ExternalLink,
-    ChevronRight,
+    CircleAlert,
+    CreditCard,
+    Loader2,
+    Pencil,
+    Plus,
     ShieldCheck,
-    Zap
+    Smartphone,
+    Star,
+    Trash2,
+    WalletCards,
+    X,
 } from "lucide-react";
-import { cn } from "@/app/lib/utils";
+import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
+import { Account, AccountInput, AccountsAPI, apiErrorMessage } from "@/app/lib/api";
 
-const ACCOUNTS = {
-    bank: [
-        { name: "ICICI Salary Account", identifier: "**** 4829", balance: "₹1,45,200", status: "Connected", primary: true },
-        { name: "HDFC Savings", identifier: "**** 1192", balance: "₹42,000", status: "Manual", primary: false },
-    ],
-    cards: [
-        { name: "HDFC Millenia CC", identifier: "**** 9021", balance: "₹12,400", status: "Connected", limit: "₹2.5L", color: "bg-zinc-900" },
-        { name: "ICICI Amazon Pay", identifier: "**** 3302", balance: "₹4,200", status: "Connected", limit: "₹1.5L", color: "bg-blue-900" },
-    ],
-    wallets: [
-        { name: "Paytm Wallet", identifier: "99999 88888", balance: "₹1,240", status: "Connected", icon: "Paytm" },
-        { name: "Amazon Pay", identifier: "99220 11223", balance: "₹5,800", status: "Connected", icon: "Amazon" },
-    ]
-};
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+const ACCOUNT_TYPES: Array<{ value: Account["type"]; label: string }> = [
+    { value: "cash", label: "Cash" }, { value: "upi", label: "UPI" }, { value: "bank", label: "Bank account" },
+    { value: "credit_card", label: "Credit card" }, { value: "debit_card", label: "Debit card" }, { value: "wallet", label: "Wallet" }, { value: "other", label: "Other" },
+];
+
+const emptyForm: AccountInput = { type: "cash", name: "", color: "#FF8865", provider: "", identifier: "", credit_limit: 0, due_day: 0, fee_month: "", balance: 0, is_default: false };
+
+function accountIcon(type: Account["type"]) {
+    if (type === "cash") return Banknote;
+    if (type === "upi") return Smartphone;
+    if (type === "bank") return Building2;
+    if (type === "credit_card" || type === "debit_card") return CreditCard;
+    return WalletCards;
+}
+
+function accountLabel(type: Account["type"]) {
+    return ACCOUNT_TYPES.find((item) => item.value === type)?.label || "Account";
+}
+
+function AccountDialog({ account, onClose, onSaved }: { account: Account | null; onClose: () => void; onSaved: () => void }) {
+    const [form, setForm] = useState<AccountInput>(account ? {
+        type: account.type, name: account.name, color: account.color || "#FF8865", provider: account.provider,
+        identifier: account.identifier, credit_limit: account.credit_limit, due_day: account.due_day,
+        fee_month: account.fee_month, balance: account.balance, is_default: account.is_default,
+    } : emptyForm);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const submit = async (event: FormEvent) => {
+        event.preventDefault();
+        setSaving(true); setError("");
+        try {
+            if (account) await AccountsAPI.update(account.id, form);
+            else await AccountsAPI.create(form);
+            onSaved();
+        } catch (requestError) {
+            setError(apiErrorMessage(requestError, "We couldn’t save this account."));
+        } finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-zinc-950/40 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
+            <form onSubmit={submit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-border bg-white shadow-2xl dark:bg-zinc-900">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white/95 p-6 backdrop-blur dark:bg-zinc-900/95"><div><h2 id="account-dialog-title" className="text-xl font-bold font-rounded">{account ? "Edit account" : "Add an account"}</h2><p className="mt-1 text-xs text-zinc-400">FINNRI tracks accounts manually; it does not connect to your bank.</p></div><button type="button" onClick={onClose} className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Close"><X className="h-5 w-5" /></button></div>
+                <div className="grid gap-5 p-6 sm:grid-cols-2">
+                    <label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Account name</span><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="e.g. Salary account" className="w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none focus:ring-4 focus:ring-accent/10 dark:bg-zinc-800" /></label>
+                    <label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Type</span><select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as Account["type"] })} className="w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none dark:bg-zinc-800">{ACCOUNT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
+                    <label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Provider or bank</span><input value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value })} placeholder="Optional" className="w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none dark:bg-zinc-800" /></label>
+                    <label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Identifier</span><input value={form.identifier} onChange={(event) => setForm({ ...form, identifier: event.target.value })} placeholder="Last 4 digits or UPI ID" className="w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none dark:bg-zinc-800" /></label>
+                    <label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Current balance</span><input type="number" step="0.01" value={form.balance} onChange={(event) => setForm({ ...form, balance: Number(event.target.value) })} className="w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none dark:bg-zinc-800" /></label>
+                    {(form.type === "credit_card") && <><label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Credit limit</span><input type="number" min="0" step="0.01" value={form.credit_limit} onChange={(event) => setForm({ ...form, credit_limit: Number(event.target.value) })} className="w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none dark:bg-zinc-800" /></label><label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Due day</span><input type="number" min="0" max="31" value={form.due_day} onChange={(event) => setForm({ ...form, due_day: Number(event.target.value) })} className="w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none dark:bg-zinc-800" /></label></>}
+                    <label className="flex items-center gap-3 rounded-xl border border-border p-4 sm:col-span-2"><input type="checkbox" checked={form.is_default} disabled={account?.is_default} onChange={(event) => setForm({ ...form, is_default: event.target.checked })} className="h-4 w-4 accent-[#FF8865]" /><span><span className="block text-sm font-bold">Use as default account</span><span className="block text-xs text-zinc-400">Selected first when adding a transaction.</span></span></label>
+                    {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950/30 sm:col-span-2">{error}</p>}
+                </div>
+                <div className="sticky bottom-0 flex justify-end gap-3 border-t border-border bg-white/95 p-5 backdrop-blur dark:bg-zinc-900/95"><button type="button" onClick={onClose} className="rounded-xl px-5 py-2.5 text-sm font-bold text-zinc-500">Cancel</button><button disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-6 text-sm font-bold text-white disabled:opacity-60">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{account ? "Save changes" : "Add account"}</button></div>
+            </form>
+        </div>
+    );
+}
 
 export default function AccountsScreen() {
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [editingAccount, setEditingAccount] = useState<Account | null | undefined>(undefined);
+
+    const loadAccounts = useCallback(async () => {
+        setLoading(true); setError("");
+        try { const response = await AccountsAPI.list(); setAccounts(response.data); }
+        catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t load your accounts.")); }
+        finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { void loadAccounts(); }, [loadAccounts]);
+
+    const deleteAccount = async (account: Account) => {
+        if (!window.confirm(`Delete ${account.name}? This is only possible when no transactions use it.`)) return;
+        try { await AccountsAPI.delete(account.id); await loadAccounts(); }
+        catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t delete this account.")); }
+    };
+
+    const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+
     return (
         <DashboardLayout>
-            <div className="space-y-10 pb-12">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold font-rounded tracking-tight dark:text-white">Accounts & Wallets</h1>
-                        <p className="text-zinc-500 text-sm font-medium mt-1">Manage where your money comes from and goes to.</p>
-                    </div>
-                    <button className="flex items-center gap-2 bg-accent text-white px-6 py-3 rounded-2xl font-bold shadow-xl shadow-accent/20 hover:scale-105 transition-all">
-                        <Plus className="w-5 h-5" />
-                        Add Account
-                    </button>
-                </div>
+            <div className="space-y-7 pb-12">
+                <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">Payment sources</p><h1 className="mt-2 text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Accounts that match your real records.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Use accounts to explain where spending happened. Balances are manually maintained and never presented as bank-synced.</p></div><button onClick={() => setEditingAccount(null)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-accent px-6 text-sm font-bold text-white shadow-lg shadow-accent/20"><Plus className="h-5 w-5" /> Add account</button></header>
 
-                {/* Bank Accounts Section */}
-                <section className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                            <Building2 className="w-4 h-4" /> Bank Accounts
-                        </h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {ACCOUNTS.bank.map((acc, i) => (
-                            <div key={i} className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-border shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
-                                {acc.primary && <div className="absolute top-0 right-0 bg-accent text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-bl-xl">Primary</div>}
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-400 group-hover:text-accent transition-colors">
-                                        <Building2 className="w-6 h-6" />
-                                    </div>
-                                    <button className="text-zinc-300 hover:text-zinc-900 transition-colors"><MoreVertical className="w-5 h-5" /></button>
-                                </div>
-                                <h4 className="text-xl font-bold font-rounded group-hover:text-accent transition-colors leading-tight">{acc.name}</h4>
-                                <p className="text-sm text-zinc-400 mt-1 font-medium">{acc.identifier}</p>
-                                <div className="mt-8 flex items-end justify-between">
-                                    <div>
-                                        <p className="text-[10px] font-bold uppercase text-zinc-400">Available Balance</p>
-                                        <p className="text-2xl font-bold mt-1 font-rounded">{acc.balance}</p>
-                                    </div>
-                                    <div className={cn(
-                                        "flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full",
-                                        acc.status === "Connected" ? "bg-green-500/10 text-green-500" : "bg-amber-500/10 text-amber-500"
-                                    )}>
-                                        {acc.status === "Connected" ? <Zap className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />}
-                                        {acc.status}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                <section className="grid gap-4 md:grid-cols-3"><article className="rounded-[1.75rem] bg-zinc-950 p-6 text-white md:col-span-2"><p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Manually recorded balance</p><p className="mt-3 text-4xl font-bold font-rounded">{currency.format(totalBalance)}</p><p className="mt-3 text-xs text-zinc-400">Across {accounts.length} account{accounts.length === 1 ? "" : "s"}; informational only.</p></article><article className="rounded-[1.75rem] border border-border bg-white p-6 dark:bg-zinc-900"><ShieldCheck className="h-6 w-6 text-accent" /><h2 className="mt-4 font-bold">No bank connection</h2><p className="mt-2 text-sm leading-6 text-zinc-500">FINNRI stores the labels and balances you enter. It does not claim automatic synchronization.</p></article></section>
 
-                {/* Credit Cards Section */}
-                <section className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                            <CreditCard className="w-4 h-4" /> Credit Cards
-                        </h3>
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {ACCOUNTS.cards.map((card, i) => (
-                            <div key={i} className={cn("p-8 rounded-[2rem] text-white shadow-xl hover:-translate-y-1 transition-all group relative overflow-hidden", card.color)}>
-                                <div className="absolute top-0 right-0 p-8 opacity-20"><CreditCard className="w-24 h-24" /></div>
-                                <div className="relative z-10 flex flex-col h-full justify-between">
-                                    <div>
-                                        <h4 className="text-lg font-bold font-rounded mb-1">{card.name}</h4>
-                                        <p className="text-xs text-white/60 font-medium tracking-widest leading-none">{card.identifier}</p>
-                                    </div>
-                                    <div className="mt-12">
-                                        <p className="text-[10px] uppercase font-bold tracking-widest text-white/50 mb-1">Current Balance</p>
-                                        <h5 className="text-xl font-bold font-rounded">{card.balance}</h5>
-                                        <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center text-[10px] uppercase font-bold tracking-widest text-white/50">
-                                            <span>Limit: {card.limit}</span>
-                                            <span className="flex items-center gap-1 text-green-400"><Zap className="w-3 h-3" /> Auto Sync</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        <button className="p-8 rounded-[2rem] border-2 border-dashed border-zinc-200 dark:border-zinc-800 hover:border-accent/40 hover:bg-accent/5 transition-all group flex flex-col items-center justify-center text-center gap-4">
-                            <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-400 group-hover:text-accent transition-colors">
-                                <Plus className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold group-hover:text-accent transition-colors">Add New Card</p>
-                                <p className="text-xs text-zinc-400 mt-1">Amex, Visa, Mastercard</p>
-                            </div>
-                        </button>
-                    </div>
-                </section>
+                {error && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><div className="flex-1"><p>{error}</p><button onClick={() => void loadAccounts()} className="mt-2 font-bold underline">Try again</button></div></div>}
 
-                {/* Wallets Section */}
-                <section className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                            <WalletIcon className="w-4 h-4" /> Wallets & Others
-                        </h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {ACCOUNTS.wallets.map((wallet, i) => (
-                            <div key={i} className="flex items-center gap-4 p-6 bg-white dark:bg-zinc-900 border border-border rounded-2xl hover:border-accent transition-colors cursor-pointer group">
-                                <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-xl flex items-center justify-center text-zinc-400 group-hover:text-accent transition-colors font-bold text-xs uppercase overflow-hidden">
-                                    {wallet.icon}
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-sm font-bold dark:text-white leading-tight">{wallet.name}</p>
-                                    <p className="text-xs text-zinc-500 mt-0.5">{wallet.identifier}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-sm font-bold group-hover:text-accent transition-colors">{wallet.balance}</p>
-                                    <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Active</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
-                {/* UPI IDs Management */}
-                <div className="bg-zinc-100 dark:bg-zinc-800 p-8 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-6 border border-border">
-                    <div className="flex items-center gap-6">
-                        <div className="w-16 h-16 bg-white dark:bg-zinc-700 rounded-2xl flex items-center justify-center text-accent shadow-sm">
-                            <Smartphone className="w-8 h-8" />
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-bold font-rounded">Manage UPI IDs</h4>
-                            <p className="text-sm text-zinc-500">Add or edit UPI handles linked to your bank accounts.</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <div className="flex -space-x-3">
-                            {[...Array(3)].map((_, i) => (
-                                <div key={i} className="w-10 h-10 border-4 border-zinc-100 dark:border-zinc-800 rounded-full bg-accent-secondary flex items-center justify-center text-accent text-[10px] font-bold">BHIM</div>
-                            ))}
-                        </div>
-                        <button className="flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white px-6 py-3 rounded-xl text-sm font-bold shadow-xl flex-1 md:flex-none">
-                            Configure <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
+                {loading ? <div className="grid min-h-80 place-items-center rounded-[2rem] border border-border bg-white dark:bg-zinc-900"><Loader2 className="h-7 w-7 animate-spin text-accent" /></div> : accounts.length === 0 ? <div className="rounded-[2rem] border border-dashed border-border p-12 text-center"><WalletCards className="mx-auto h-8 w-8 text-zinc-300" /><h2 className="mt-4 text-lg font-bold">No accounts yet</h2><p className="mt-2 text-sm text-zinc-500">Add cash, UPI, bank, card, or wallet sources.</p></div> : (
+                    <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{accounts.map((account) => {
+                        const Icon = accountIcon(account.type);
+                        return <article key={account.id} className="group relative overflow-hidden rounded-[2rem] border border-border bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl dark:bg-zinc-900"><div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: account.color || "#FF8865" }} /><div className="flex items-start justify-between"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-500 dark:bg-zinc-800"><Icon className="h-5 w-5" /></span><div className="flex items-center gap-1">{account.is_default && <span className="mr-1 inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent"><Star className="h-3 w-3 fill-current" /> Default</span>}<button onClick={() => setEditingAccount(account)} className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white" aria-label={`Edit ${account.name}`}><Pencil className="h-4 w-4" /></button><button onClick={() => void deleteAccount(account)} className="rounded-xl p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30" aria-label={`Delete ${account.name}`}><Trash2 className="h-4 w-4" /></button></div></div><p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">{accountLabel(account.type)}</p><h2 className="mt-1 text-xl font-bold font-rounded">{account.name}</h2><p className="mt-1 min-h-5 text-xs text-zinc-400">{[account.provider, account.identifier].filter(Boolean).join(" · ") || "No identifier added"}</p><div className="mt-7 border-t border-border pt-5"><p className="text-xs text-zinc-400">Recorded balance</p><p className="mt-1 text-2xl font-bold font-rounded">{currency.format(account.balance)}</p>{account.type === "credit_card" && account.credit_limit > 0 && <p className="mt-2 text-xs text-zinc-400">Limit {currency.format(account.credit_limit)}{account.due_day ? ` · due day ${account.due_day}` : ""}</p>}</div></article>;
+                    })}</section>
+                )}
             </div>
+            {editingAccount !== undefined && <AccountDialog account={editingAccount} onClose={() => setEditingAccount(undefined)} onSaved={() => { setEditingAccount(undefined); void loadAccounts(); }} />}
         </DashboardLayout>
     );
 }

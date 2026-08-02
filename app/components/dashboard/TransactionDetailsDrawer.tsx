@@ -1,31 +1,41 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
     X,
-    Edit3,
     Trash2,
     Check,
-    Brain,
     Tag,
     Wallet,
     Clock,
     ShieldCheck,
     Copy,
-    Loader2
+    Loader2,
+    Users
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { EntriesAPI } from "@/app/lib/api";
+import { apiErrorMessage, EntriesAPI, SplitAPI, SplitBill, Transaction, TransactionInput } from "@/app/lib/api";
 
 interface TransactionDetailsDrawerProps {
     isOpen: boolean;
     onClose: () => void;
-    transaction: any;
+    transaction: Transaction | null;
 }
 
 export default function TransactionDetailsDrawer({ isOpen, onClose, transaction }: TransactionDetailsDrawerProps) {
     const [loading, setLoading] = useState(false);
+    const [splitBill, setSplitBill] = useState<SplitBill | null>(null);
+
+    useEffect(() => {
+        let active = true;
+        if (!isOpen || !transaction) return;
+        SplitAPI.listBills().then((response) => {
+            if (active) setSplitBill(response.data.find((bill) => bill.entry_id === transaction.id) || null);
+        }).catch(() => { if (active) setSplitBill(null); });
+        return () => { active = false; };
+    }, [isOpen, transaction]);
 
     if (!transaction) return null;
 
@@ -33,11 +43,11 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
         if (!confirm("Are you sure you want to delete this transaction?")) return;
         setLoading(true);
         try {
-            await EntriesAPI.delete(transaction.ID);
+            await EntriesAPI.delete(transaction.id);
             onClose(); // Parent should refresh on close
         } catch (err) {
             console.error("Failed to delete", err);
-            alert("Failed to delete transaction.");
+            alert(apiErrorMessage(err, "Failed to delete transaction."));
             setLoading(false);
         }
     };
@@ -45,16 +55,25 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
     const handleDuplicate = async () => {
         setLoading(true);
         try {
-            const { ID, created_at, ...rest } = transaction;
-            // Create copy
+            const normalizedMode: TransactionInput["mode"] = transaction.mode === "UPI" || transaction.mode === "Credit Card" || transaction.mode === "Wallets" ? transaction.mode : "Cash";
             await EntriesAPI.create({
-                ...rest,
-                date: new Date().toISOString().split('T')[0], // Today
-                title: (rest.merchant || rest.title) + " (Copy)"
+                title: `${transaction.merchant || transaction.title} (Copy)`,
+                merchant: transaction.merchant,
+                amount: transaction.amount,
+                currency: "INR",
+                type: transaction.type,
+                source: "manual",
+                mode: normalizedMode,
+                category: transaction.category,
+                date: new Date().toISOString().split("T")[0],
+                time: transaction.time,
+                tags: transaction.tags,
+                notes: transaction.notes,
+                account_id: transaction.account_id,
             });
             onClose();
         } catch (err) {
-            console.error("Failed to duplicate", err);
+            alert(apiErrorMessage(err, "Failed to duplicate transaction."));
             setLoading(false);
         }
     };
@@ -82,7 +101,6 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                         <div className="p-8 border-b border-border flex items-center justify-between">
                             <h3 className="text-xl font-bold font-rounded">Transaction Details</h3>
                             <div className="flex items-center gap-2">
-                                <button className="p-2.5 text-zinc-400 hover:text-accent hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"><Edit3 className="w-5 h-5" /></button>
                                 <button onClick={onClose} className="p-2.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-xl transition-all"><X className="w-5 h-5" /></button>
                             </div>
                         </div>
@@ -112,31 +130,13 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                                     </div>
                                     <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-zinc-400">
                                         <span className="flex items-center gap-2"><Wallet className="w-3.5 h-3.5" /> Account</span>
-                                        <span className="text-zinc-900 dark:text-white">{transaction.mode || "Cash"}</span>
+                                        <span className="text-zinc-900 dark:text-white">{transaction.account?.name || transaction.mode || "Cash"}</span>
                                     </div>
                                     <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-zinc-400">
                                         <span className="flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> Status</span>
                                         <span className="text-green-500 flex items-center gap-1"><Check className="w-3 h-3" /> Confirmed</span>
                                     </div>
                                 </div>
-
-                                {transaction.needs_confirmation && (
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block ml-2 text-center">AI Extraction Insights</label>
-                                        <div className="bg-accent/5 border border-accent/20 p-6 rounded-3xl relative overflow-hidden group">
-                                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform"><Brain className="w-12 h-12" /></div>
-                                            <p className="text-xs font-medium text-zinc-500 leading-relaxed italic">
-                                                "Automated extraction."
-                                            </p>
-                                            <div className="mt-4 flex items-center gap-4">
-                                                <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-accent w-[90%] rounded-full shadow-sm" />
-                                                </div>
-                                                <span className="text-[10px] font-bold text-accent">90%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
 
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between ml-2">
@@ -152,6 +152,8 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                                         {(!transaction.tags || transaction.tags.length === 0) && <span className="text-xs text-zinc-400 px-3">No tags</span>}
                                     </div>
                                 </div>
+
+                                {splitBill?.entry_id === transaction.id && <div className="rounded-3xl border border-accent/20 bg-accent/5 p-5"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-accent/10 text-accent"><Users className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-accent">Shared expense</p><p className="mt-1 text-sm font-bold">{splitBill.participants.length} friend share{splitBill.participants.length === 1 ? "" : "s"}</p><p className="mt-2 text-xs leading-5 text-zinc-500">{splitBill.participants.map((participant) => `${participant.friend.name}: ₹${participant.share_amount}`).join(" · ")}</p><Link href="/dashboard/splits" onClick={onClose} className="mt-3 inline-block text-xs font-bold text-accent underline">Open split ledger</Link></div></div></div>}
                             </div>
                         </div>
 
