@@ -56,6 +56,7 @@ export interface Transaction {
     source_text?: string;
     account_id: number;
     account?: Account;
+    category_suggestions?: string[];
     created_at: string;
     updated_at?: string;
 }
@@ -273,14 +274,50 @@ export interface DashboardAccountSpend {
     percentage: number;
 }
 
+export interface DashboardBudgetStatus {
+    budget_id: number;
+    name: string;
+    category: string;
+    limit_amount: number;
+    spent_amount: number;
+    remaining_amount: number;
+    percentage: number;
+    alert_threshold_percent: number;
+    days_left: number;
+    status: "safe" | "watch" | "exceeded";
+}
+
+export interface DashboardDailySpend {
+    date: string;
+    amount: number;
+    count: number;
+}
+
 export interface DashboardInsight {
     kind: string;
-    severity: "info" | "warning";
+    severity: "info" | "warning" | "success";
     title: string;
     body: string;
+    explanation?: string;
+    action_label?: string;
+    category?: string;
+    merchant?: string;
+    budget_id?: number;
+    account_id?: number | null;
+    account_name?: string;
+    amount?: number;
+    limit_amount?: number;
+    remaining_amount?: number;
+    status?: string;
+    percentage?: number;
+    change_percentage?: number;
+    transaction_count?: number;
+    next_expected_date?: string;
+    confidence?: number;
 }
 
 export interface RecurringCandidate {
+    candidate_key: string;
     label: string;
     merchant: string;
     category: string;
@@ -299,7 +336,10 @@ export interface DashboardResponse {
     top_categories: DashboardCategory[];
     top_merchants: DashboardMerchant[];
     account_spending: DashboardAccountSpend[];
+    budget_statuses: DashboardBudgetStatus[];
+    daily_spending: DashboardDailySpend[];
     recent_transactions: Transaction[];
+    review_items: Transaction[];
     insights: DashboardInsight[];
     recurring_candidates: RecurringCandidate[];
 }
