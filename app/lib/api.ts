@@ -466,6 +466,8 @@ export function apiErrorMessage(error: unknown, fallback: string) {
 
 export const AuthAPI = {
     loginGuest: (deviceId?: string) => api.post<AuthResponse>("/v1/auth/guest", { device_id: deviceId }),
+    loginGoogle: (payload: { id_token: string; nonce?: string; guest_uuid?: string; device_id?: string; biometrics_enabled?: boolean }) =>
+        api.post<AuthResponse>("/v1/auth/google", payload),
     identify: (identifier: string) => api.post<{ exists: boolean; is_guest?: boolean }>("/v1/auth/identify", { identifier }),
     sendOTP: (identifier: string) => api.post<{ message: string; expires_at: string; dev_otp?: string }>("/v1/auth/otp/send", { identifier }),
     verifyOTP: (identifier: string, otp: string) => api.post<{ claim_token: string }>("/v1/auth/otp/verify", { identifier, otp }),

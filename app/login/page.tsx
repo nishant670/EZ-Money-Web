@@ -1,6 +1,6 @@
 "use client";
 
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,6 +25,19 @@ import { useAuth } from "@/app/context/AuthContext";
 type LoginStep = "choice" | "identifier" | "otp" | "pin";
 type AuthMode = "login" | "register" | "reset";
 
+declare global {
+    interface Window {
+        google?: {
+            accounts?: {
+                id?: {
+                    initialize: (config: { client_id: string; callback: (response: { credential?: string }) => void; nonce?: string }) => void;
+                    renderButton: (element: HTMLElement, options: Record<string, string | number | boolean>) => void;
+                };
+            };
+        };
+    }
+}
+
 function webDeviceID() {
     const existing = localStorage.getItem("finnri_web_device_id");
     if (existing) return existing;
@@ -36,6 +49,7 @@ function webDeviceID() {
 export default function LoginPage() {
     const router = useRouter();
     const { login, loginAsGuest, user } = useAuth();
+    const googleButtonRef = useRef<HTMLDivElement | null>(null);
     const [step, setStep] = useState<LoginStep>("choice");
     const [authMode, setAuthMode] = useState<AuthMode>("login");
     const [loginType, setLoginType] = useState<"email" | "phone">("email");
@@ -44,7 +58,94 @@ export default function LoginPage() {
     const [pin, setPin] = useState("");
     const [devOTP, setDevOTP] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const googleNonce = useRef<string>("");
+
+    useEffect(() => {
+        if (step !== "choice" || !googleButtonRef.current) return;
+        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+        if (!clientId) return;
+
+        googleNonce.current = crypto.randomUUID();
+        const handleCredential = async (response: { credential?: string }) => {
+            if (!response.credential) {
+                setError("Google did not return a sign-in token.");
+                return;
+            }
+            setIsGoogleLoading(true);
+            setError(null);
+            try {
+                const result = await AuthAPI.loginGoogle({
+                    id_token: response.credential,
+                    nonce: googleNonce.current,
+                    guest_uuid: user?.is_guest ? user.uuid : undefined,
+                    device_id: webDeviceID(),
+                    biometrics_enabled: false,
+                });
+                login(result.data.token, result.data.user);
+                router.replace("/dashboard");
+            } catch (requestError) {
+                setError(apiErrorMessage(requestError, "Google sign-in failed."));
+            } finally {
+                setIsGoogleLoading(false);
+            }
+        };
+
+        let renderedGoogleButtonWidth = 0;
+        const getGoogleButtonWidth = () => {
+            if (!googleButtonRef.current) return 400;
+            const containerWidth = Math.floor(googleButtonRef.current.getBoundingClientRect().width);
+            return Math.min(Math.max(containerWidth, 200), 400);
+        };
+
+        const renderGoogleButton = () => {
+            if (!window.google?.accounts?.id || !googleButtonRef.current) return false;
+            const buttonWidth = getGoogleButtonWidth();
+            if (buttonWidth === renderedGoogleButtonWidth && googleButtonRef.current.childElementCount > 0) return true;
+            renderedGoogleButtonWidth = buttonWidth;
+            googleButtonRef.current.innerHTML = "";
+            window.google.accounts.id.initialize({
+                client_id: clientId,
+                callback: handleCredential,
+                nonce: googleNonce.current,
+            });
+            window.google.accounts.id.renderButton(googleButtonRef.current, {
+                type: "standard",
+                theme: "outline_dark",
+                size: "large",
+                shape: "pill",
+                text: "continue_with",
+                width: buttonWidth,
+            });
+            return true;
+        };
+
+        const resizeObserver = typeof ResizeObserver !== "undefined" && googleButtonRef.current
+            ? new ResizeObserver(() => requestAnimationFrame(() => { renderGoogleButton(); }))
+            : null;
+        resizeObserver?.observe(googleButtonRef.current);
+
+        if (renderGoogleButton()) return () => resizeObserver?.disconnect();
+        const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+        if (existingScript) {
+            existingScript.addEventListener("load", renderGoogleButton, { once: true });
+            return () => {
+                resizeObserver?.disconnect();
+                existingScript.removeEventListener("load", renderGoogleButton);
+            };
+        }
+        const script = document.createElement("script");
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+        script.addEventListener("load", renderGoogleButton, { once: true });
+        document.head.appendChild(script);
+        return () => {
+            resizeObserver?.disconnect();
+            script.removeEventListener("load", renderGoogleButton);
+        };
+    }, [login, router, step, user?.is_guest, user?.uuid]);
 
     const normalizedIdentifier = () => loginType === "email"
         ? identifier.trim().toLowerCase()
@@ -168,6 +269,16 @@ export default function LoginPage() {
 
                         {step === "choice" && <div className="space-y-3">
                             <div className="mb-6 text-center"><h1 className="text-2xl font-bold font-rounded">Open your dashboard</h1><p className="mt-2 text-sm leading-6 text-zinc-500">Sign in to your FINNRI account or start securely as a guest.</p></div>
+                            <div className="min-h-12 w-full">
+                                {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+                                    <div className={`flex w-full justify-center [&>div]:!w-full [&_iframe]:!w-full ${isGoogleLoading ? "pointer-events-none opacity-60" : ""}`} ref={googleButtonRef} />
+                                ) : (
+                                    <button disabled className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-border bg-zinc-50 text-sm font-bold text-zinc-400">
+                                        Google sign-in is not configured
+                                    </button>
+                                )}
+                            </div>
+                            <div className="relative py-3"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div><span className="relative mx-auto block w-fit bg-white px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-300 dark:bg-zinc-900">or use PIN</span></div>
                             <button onClick={() => chooseType("email")} className="group flex min-h-20 w-full items-center justify-between rounded-2xl border border-border bg-zinc-50 p-4 text-left transition hover:border-accent/30 hover:bg-white dark:bg-zinc-800/50 dark:hover:bg-zinc-800"><span className="flex items-center gap-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent/10 text-accent"><Mail className="h-5 w-5" /></span><span><span className="block font-bold">Continue with email</span><span className="mt-1 block text-xs text-zinc-400">PIN for returning users, OTP to register</span></span></span><ChevronRight className="h-5 w-5 text-zinc-300 transition group-hover:translate-x-1 group-hover:text-accent" /></button>
                             <button onClick={() => chooseType("phone")} className="group flex min-h-20 w-full items-center justify-between rounded-2xl border border-border bg-zinc-50 p-4 text-left transition hover:border-accent/30 hover:bg-white dark:bg-zinc-800/50 dark:hover:bg-zinc-800"><span className="flex items-center gap-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent/10 text-accent"><Phone className="h-5 w-5" /></span><span><span className="block font-bold">Continue with phone</span><span className="mt-1 block text-xs text-zinc-400">Use your number with country code</span></span></span><ChevronRight className="h-5 w-5 text-zinc-300 transition group-hover:translate-x-1 group-hover:text-accent" /></button>
                             <div className="relative py-3"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div><span className="relative mx-auto block w-fit bg-white px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-300 dark:bg-zinc-900">or</span></div>
