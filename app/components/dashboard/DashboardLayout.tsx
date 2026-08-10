@@ -9,6 +9,7 @@ import {
     Bell,
     Calculator,
     CheckCheck,
+    ChartNoAxesColumnIncreasing,
     Inbox,
     HandCoins,
     LayoutDashboard,
@@ -27,6 +28,7 @@ import { AppNotification, NotificationsAPI } from "@/app/lib/api";
 const NAV_ITEMS = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
     { name: "Insights", href: "/dashboard/insights", icon: BarChart3 },
+    { name: "Reports", href: "/dashboard/reports", icon: ChartNoAxesColumnIncreasing },
     { name: "Transactions", href: "/dashboard/transactions", icon: TableProperties },
     { name: "Accounts", href: "/dashboard/accounts", icon: Wallet },
     { name: "Splits", href: "/dashboard/splits", icon: HandCoins },
