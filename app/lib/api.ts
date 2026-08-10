@@ -304,6 +304,54 @@ export interface DashboardResponse {
     recurring_candidates: RecurringCandidate[];
 }
 
+export interface TransactionReportSummary {
+    total_expense: number;
+    total_income: number;
+    net_cashflow: number;
+    transaction_count: number;
+    expense_count: number;
+    income_count: number;
+}
+
+export interface TransactionReportBreakdown {
+    key: string;
+    label: string;
+    amount: number;
+    percentage: number;
+    transaction_count: number;
+}
+
+export interface TransactionAccountReportBreakdown {
+    account_id: number | null;
+    account_name: string;
+    amount: number;
+    percentage: number;
+    transaction_count: number;
+}
+
+export interface TransactionMonthlyReportBreakdown {
+    month: string;
+    expense: number;
+    income: number;
+    net_cashflow: number;
+    transaction_count: number;
+}
+
+export interface TransactionTypeReportBreakdown {
+    type: "expense" | "income";
+    amount: number;
+    transaction_count: number;
+}
+
+export interface TransactionReportResponse {
+    summary: TransactionReportSummary;
+    by_category: TransactionReportBreakdown[];
+    by_merchant: TransactionReportBreakdown[];
+    by_account: TransactionAccountReportBreakdown[];
+    by_month: TransactionMonthlyReportBreakdown[];
+    by_type: TransactionTypeReportBreakdown[];
+}
+
 export interface Budget {
     id: number;
     user_id: number;
@@ -438,6 +486,10 @@ export const AuthAPI = {
 
 export const EntriesAPI = {
     list: (params?: EntryListParams) => api.get<EntryListResponse>("/v1/entries", { params }),
+    exportCSV: (params?: EntryListParams) => api.get<Blob>("/v1/entries/export", {
+        params: { ...params, format: "csv" },
+        responseType: "blob",
+    }),
     create: (data: TransactionInput) => api.post<Transaction>("/v1/entries", data),
     parse: (formData: FormData) => api.post<ParsedTransaction>("/v1/parse", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -449,6 +501,11 @@ export const EntriesAPI = {
 export const DashboardAPI = {
     get: (params?: { start_date?: string; end_date?: string; tz?: string }) =>
         api.get<DashboardResponse>("/v1/dashboard", { params }),
+};
+
+export const ReportsAPI = {
+    transactionSummary: (params?: EntryListParams) =>
+        api.get<TransactionReportResponse>("/v1/reports/transactions/summary", { params }),
 };
 
 export const AccountsAPI = {
