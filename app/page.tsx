@@ -50,6 +50,7 @@ export default function Home() {
             <Link href="#how-it-works" className="text-sm font-medium hover:text-accent transition-colors">How it works</Link>
             <Link href="#security" className="text-sm font-medium hover:text-accent transition-colors">Security</Link>
             <Link href="#pricing" className="text-sm font-medium hover:text-accent transition-colors">Pricing</Link>
+            <Link href="/tools" className="text-sm font-medium hover:text-accent transition-colors">Free Tools</Link>
             <Link href="/login" className="text-sm font-semibold text-accent hover:opacity-80 transition-opacity">Web Dashboard</Link>
             <Link href="#download" className="bg-accent text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-accent/30 hover:scale-105 active:scale-95 transition-all">
               Download App
@@ -70,6 +71,7 @@ export default function Home() {
               <Link href="#how-it-works" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">How it works</Link>
               <Link href="#security" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Security</Link>
               <Link href="#pricing" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Pricing</Link>
+              <Link href="/tools" className="text-lg font-medium">Free Tools</Link>
               <div className="h-px bg-border my-2" />
               <Link href="/login" className="text-lg font-bold text-accent">Web Dashboard Login</Link>
               <Link href="#download" className="bg-accent text-white px-6 py-4 rounded-2xl text-center font-bold shadow-lg">
@@ -320,11 +322,11 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center text-white"><CheckCircle2 className="w-4 h-4" /></div>
-                    Use budgets, recurring-payment reviews, and EMI tools
+                    Use budgets, recurring-payment reviews, and planning tools
                   </li>
                 </ul>
-                <Link href="/login" className="inline-flex items-center gap-2 bg-accent text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-accent/20 hover:scale-105 transition-transform">
-                  Login to Web Dashboard
+                <Link href="/tools" className="inline-flex items-center gap-2 bg-accent text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-accent/20 hover:scale-105 transition-transform">
+                  Use Free Tools
                   <ArrowRight className="w-5 h-5" />
                 </Link>
               </div>
