@@ -6,6 +6,9 @@ import { BillDialog, FriendDialog, GroupDialog, SettlementDialog } from "@/app/c
 import { apiErrorMessage, SplitActivityItem, SplitAPI, SplitBalance, SplitBill, SplitFriend, SplitGroup, SplitSettlement } from "@/app/lib/api";
 import { formatDate, formatMoney } from "@/app/lib/format";
 import { cn } from "@/app/lib/utils";
+import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
+import { useToast } from "@/app/components/ui/Toast";
+import { PageSkeleton } from "@/app/components/ui/Skeleton";
 
 type SplitSection = "friends" | "groups" | "bills" | "settlements" | "balances" | "activity";
 type SectionErrors = Partial<Record<SplitSection, string>>;
@@ -26,13 +29,14 @@ function SectionError({ message, onRetry }: { message?: string; onRetry: () => v
 function BalanceCard({ balance, onSettle }: { balance: SplitBalance; onSettle: (friend: SplitFriend) => void }) {
     const positive = balance.net_balance > 0;
     const settled = balance.net_balance === 0;
-    return <article className="rounded-[1.75rem] border border-border bg-white p-5 dark:bg-zinc-900">
+    return <article className="rounded-[2rem] border border-border bg-white p-5 dark:bg-zinc-900">
         <div className="flex items-start gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent/10 font-bold text-accent">{balance.friend.name.slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><h3 className="truncate font-bold">{balance.friend.name}</h3><p className="mt-1 text-xs text-zinc-400">{balance.friend.email || balance.friend.phone || "Private contact"}</p></div></div>
         <div className="mt-5 flex items-end justify-between border-t border-border pt-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">{settled ? "All settled" : positive ? "Owes you" : "You owe"}</p><p className={cn("mt-1 text-xl font-bold font-rounded", settled ? "text-zinc-400" : positive ? "text-emerald-600" : "text-amber-600")}>{formatMoney(Math.abs(balance.net_balance))}</p></div>{!settled && <button onClick={() => onSettle(balance.friend)} className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-600 hover:bg-accent/10 hover:text-accent dark:bg-zinc-800">Settle</button>}</div>
     </article>;
 }
 
 export default function SplitsScreen() {
+    const { toast } = useToast();
     const [friends, setFriends] = useState<SplitFriend[]>([]);
     const [groups, setGroups] = useState<SplitGroup[]>([]);
     const [bills, setBills] = useState<SplitBill[]>([]);
@@ -43,12 +47,14 @@ export default function SplitsScreen() {
     const [activityTotal, setActivityTotal] = useState(0);
     const [activityLoading, setActivityLoading] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [hasLoaded, setHasLoaded] = useState(false);
     const [actionError, setActionError] = useState("");
     const [sectionErrors, setSectionErrors] = useState<SectionErrors>({});
     const [friendDialog, setFriendDialog] = useState<SplitFriend | null | undefined>(undefined);
     const [groupDialog, setGroupDialog] = useState<SplitGroup | null | undefined>(undefined);
     const [billDialog, setBillDialog] = useState<SplitBill | null | undefined>(undefined);
     const [settlementFriend, setSettlementFriend] = useState<SplitFriend | null | undefined>(undefined);
+    const [confirmTarget, setConfirmTarget] = useState<{ kind: "friend"; item: SplitFriend } | { kind: "group"; item: SplitGroup } | { kind: "bill"; item: SplitBill } | null>(null);
 
     const loadSplits = useCallback(async () => {
         setLoading(true);
@@ -69,6 +75,7 @@ export default function SplitsScreen() {
         } else errors.activity = apiErrorMessage(activityResult.reason, "We couldn’t load split activity.");
         setSectionErrors(errors);
         setLoading(false);
+        setHasLoaded(true);
     }, []);
 
     const loadActivityPage = useCallback(async (page: number) => {
@@ -96,17 +103,17 @@ export default function SplitsScreen() {
     const activityEnd = Math.min(activityPage * ACTIVITY_PAGE_SIZE, activityTotal);
     const closeAndReload = () => { setFriendDialog(undefined); setGroupDialog(undefined); setBillDialog(undefined); setSettlementFriend(undefined); void loadSplits(); };
 
-    const archiveFriend = async (friend: SplitFriend) => {
-        if (!window.confirm(`Archive ${friend.name}? Existing bills and balances remain in history.`)) return;
-        try { await SplitAPI.archiveFriend(friend.id); await loadSplits(); } catch (requestError) { setActionError(apiErrorMessage(requestError, "We couldn’t archive this friend.")); }
+    const archiveFriend = async (friend: SplitFriend, confirmed = false) => {
+        if (!confirmed) { setConfirmTarget({ kind: "friend", item: friend }); return; }
+        try { await SplitAPI.archiveFriend(friend.id); toast({ title: `${friend.name} archived` }); setConfirmTarget(null); await loadSplits(); } catch (requestError) { setActionError(apiErrorMessage(requestError, "We couldn’t archive this friend.")); }
     };
-    const archiveGroup = async (group: SplitGroup) => {
-        if (!window.confirm(`Archive ${group.name}? Existing bills remain in history.`)) return;
-        try { await SplitAPI.archiveGroup(group.id); await loadSplits(); } catch (requestError) { setActionError(apiErrorMessage(requestError, "We couldn’t archive this group.")); }
+    const archiveGroup = async (group: SplitGroup, confirmed = false) => {
+        if (!confirmed) { setConfirmTarget({ kind: "group", item: group }); return; }
+        try { await SplitAPI.archiveGroup(group.id); toast({ title: `${group.name} archived` }); setConfirmTarget(null); await loadSplits(); } catch (requestError) { setActionError(apiErrorMessage(requestError, "We couldn’t archive this group.")); }
     };
-    const deleteBill = async (bill: SplitBill) => {
-        if (!window.confirm(`Delete the split bill “${bill.title}”?`)) return;
-        try { await SplitAPI.deleteBill(bill.id); await loadSplits(); } catch (requestError) { setActionError(apiErrorMessage(requestError, "We couldn’t delete this split bill.")); }
+    const deleteBill = async (bill: SplitBill, confirmed = false) => {
+        if (!confirmed) { setConfirmTarget({ kind: "bill", item: bill }); return; }
+        try { await SplitAPI.deleteBill(bill.id); toast({ title: `${bill.title} deleted` }); setConfirmTarget(null); await loadSplits(); } catch (requestError) { setActionError(apiErrorMessage(requestError, "We couldn’t delete this split bill.")); }
     };
 
     return <>
@@ -114,9 +121,9 @@ export default function SplitsScreen() {
             <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">Shared expenses</p><h1 className="mt-2 text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Know exactly who owes whom.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Track friends, groups, shared bills, balances, and real settlements from one private ledger.</p></div><div className="flex flex-wrap gap-3"><button onClick={() => void loadSplits()} disabled={loading} className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-white text-zinc-500 disabled:opacity-50 dark:bg-zinc-900" aria-label="Refresh split ledger"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /></button><button onClick={() => setSettlementFriend(null)} disabled={!friends.length} className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-white px-5 text-sm font-bold text-zinc-600 disabled:opacity-40 dark:bg-zinc-900 dark:text-zinc-300"><HandCoins className="h-4 w-4" /> Record settlement</button><button onClick={() => setBillDialog(null)} disabled={!friends.length} className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-accent px-5 text-sm font-bold text-white shadow-lg shadow-accent/20 disabled:opacity-40"><Plus className="h-4 w-4" /> Add split bill</button></div></header>
             {actionError && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><p>{actionError}</p></div>}
             <nav className="flex flex-wrap gap-2 rounded-2xl border border-border bg-white p-2 dark:bg-zinc-900" aria-label="Split ledger sections">{[["balances", "Balances"], ["activity", "Activity"], ["settlements", "Settlements"], ["friends", "Friends"], ["groups", "Groups"], ["bills", "Bills"]].map(([id, label]) => <a key={id} href={`#${id}`} className="rounded-xl px-3 py-2 text-xs font-bold text-zinc-500 hover:bg-accent/10 hover:text-accent">{label}</a>)}</nav>
-            <section className="grid gap-4 md:grid-cols-3"><article className="rounded-[1.75rem] bg-zinc-950 p-6 text-white"><ArrowDownLeft className="h-5 w-5 text-emerald-400" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Owed to you</p><p className="mt-2 text-3xl font-bold font-rounded">{formatMoney(totals.owedToYou)}</p></article><article className="rounded-[1.75rem] border border-border bg-white p-6 dark:bg-zinc-900"><ArrowUpRight className="h-5 w-5 text-amber-500" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">You owe</p><p className="mt-2 text-3xl font-bold font-rounded">{formatMoney(totals.youOwe)}</p></article><article className="rounded-[1.75rem] border border-border bg-white p-6 dark:bg-zinc-900"><Scale className="h-5 w-5 text-accent" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Net position</p><p className="mt-2 text-3xl font-bold font-rounded">{formatMoney(totals.owedToYou - totals.youOwe)}</p><p className="mt-2 text-xs text-zinc-400">Across {friends.length} active friend{friends.length === 1 ? "" : "s"}</p></article></section>
+            <section className="grid gap-4 md:grid-cols-3"><article className="rounded-[2rem] bg-zinc-950 p-6 text-white"><ArrowDownLeft className="h-5 w-5 text-emerald-400" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Owed to you</p><p className="mt-2 text-3xl font-bold font-rounded">{formatMoney(totals.owedToYou)}</p></article><article className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900"><ArrowUpRight className="h-5 w-5 text-amber-500" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">You owe</p><p className="mt-2 text-3xl font-bold font-rounded">{formatMoney(totals.youOwe)}</p></article><article className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900"><Scale className="h-5 w-5 text-accent" /><p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Net position</p><p className="mt-2 text-3xl font-bold font-rounded">{formatMoney(totals.owedToYou - totals.youOwe)}</p><p className="mt-2 text-xs text-zinc-400">Across {friends.length} active friend{friends.length === 1 ? "" : "s"}</p></article></section>
 
-            {loading ? <div className="grid min-h-80 place-items-center rounded-[2rem] border border-border bg-white dark:bg-zinc-900"><Loader2 className="h-7 w-7 animate-spin text-accent" /></div> : <>
+            {loading && !hasLoaded ? <PageSkeleton /> : <>
                 <section id="balances" className="scroll-mt-24"><div className="mb-4"><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Balances</p><h2 className="mt-1 text-2xl font-bold font-rounded">Settle without guesswork</h2></div><SectionError message={sectionErrors.balances} onRetry={() => void loadSplits()} />{!sectionErrors.balances && (balances.length === 0 ? <div className="rounded-[2rem] border border-dashed border-border p-10 text-center"><WalletCards className="mx-auto h-8 w-8 text-zinc-300" /><h3 className="mt-4 font-bold">No balances yet</h3><p className="mt-2 text-sm text-zinc-500">Add friends and record your first shared bill.</p></div> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{balances.map((balance) => <BalanceCard key={balance.friend.id} balance={balance} onSettle={(friend) => setSettlementFriend(friend)} />)}</div>)}</section>
                 <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
                     <section id="activity" className="scroll-mt-24 rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Ledger</p><h2 className="mt-1 text-2xl font-bold font-rounded">Activity</h2></div><span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-500 dark:bg-zinc-800">{activityStart}–{activityEnd} of {activityTotal}</span></div><SectionError message={sectionErrors.activity} onRetry={() => void loadActivityPage(activityPage)} />{activityLoading ? <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-accent" /> : !sectionErrors.activity && (activity.length === 0 ? <p className="mt-8 rounded-2xl bg-zinc-50 p-8 text-center text-sm text-zinc-400 dark:bg-zinc-800">Your split activity will appear here.</p> : <div className="mt-6 divide-y divide-border">{activity.map((item) => <article key={item.id} className="flex gap-4 py-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-accent/10 text-accent"><ActivityIcon type={item.type} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-bold">{item.title}</h3><p className="mt-1 text-xs text-zinc-400">{formatDate(item.date)}{item.participant_count ? ` · ${item.participant_count} friend${item.participant_count === 1 ? "" : "s"}` : ""}</p></div>{typeof item.amount === "number" && <p className="text-sm font-bold">{formatMoney(item.amount)}</p>}</div>{item.notes && <p className="mt-2 text-xs leading-5 text-zinc-500">{item.notes}</p>}</div></article>)}</div>)}<div className="mt-5 flex items-center justify-between border-t border-border pt-4"><button type="button" onClick={() => void loadActivityPage(activityPage - 1)} disabled={activityLoading || activityPage <= 1} className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold text-zinc-500 disabled:opacity-35"><ArrowLeft className="h-4 w-4" />Previous</button><span className="text-xs font-semibold text-zinc-400">Page {activityPage} of {activityPages}</span><button type="button" onClick={() => void loadActivityPage(activityPage + 1)} disabled={activityLoading || activityPage >= activityPages} className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold text-zinc-500 disabled:opacity-35">Next<ArrowRight className="h-4 w-4" /></button></div></section>
@@ -134,5 +141,6 @@ export default function SplitsScreen() {
         {groupDialog !== undefined && <GroupDialog group={groupDialog || undefined} friends={friends} onClose={() => setGroupDialog(undefined)} onSaved={closeAndReload} />}
         {billDialog !== undefined && <BillDialog bill={billDialog || undefined} friends={friends} groups={groups} onClose={() => setBillDialog(undefined)} onSaved={closeAndReload} />}
         {settlementFriend !== undefined && <SettlementDialog friends={friends} suggestedFriend={settlementFriend || undefined} onClose={() => setSettlementFriend(undefined)} onSaved={closeAndReload} />}
+        <ConfirmDialog open={Boolean(confirmTarget)} title={confirmTarget?.kind === "bill" ? `Delete ${confirmTarget.item.title}?` : `Archive ${confirmTarget?.item.name || "item"}?`} description={confirmTarget?.kind === "friend" ? "Existing bills and balances remain in history, but this friend will no longer be available for new splits." : confirmTarget?.kind === "group" ? "Existing bills remain in history, but this group will no longer be available for new splits." : "This permanently removes the split bill and changes the balances it created."} confirmLabel={confirmTarget?.kind === "bill" ? "Delete bill" : "Archive"} onClose={() => setConfirmTarget(null)} onConfirm={() => { if (confirmTarget?.kind === "friend") return archiveFriend(confirmTarget.item, true); if (confirmTarget?.kind === "group") return archiveGroup(confirmTarget.item, true); if (confirmTarget?.kind === "bill") return deleteBill(confirmTarget.item, true); }} />
     </>;
 }

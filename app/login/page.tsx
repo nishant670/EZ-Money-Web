@@ -274,7 +274,7 @@ export default function LoginPage() {
 
     return (
         <main className="min-h-screen bg-[#FDF5F7] p-4 dark:bg-zinc-950 sm:grid sm:place-items-center sm:p-6">
-            <div className="mx-auto flex min-h-[680px] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-white shadow-2xl shadow-accent/5 dark:bg-zinc-900 sm:rounded-[2.5rem]">
+            <div className="mx-auto flex min-h-[680px] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-white shadow-2xl shadow-accent/5 dark:bg-zinc-900 sm:rounded-[2rem]">
                 <div className="flex-1 p-6 sm:p-9">
                     <Link href="/" className="mx-auto flex w-fit flex-col items-center gap-3">
                         <span className="relative grid h-16 w-36 place-items-center overflow-hidden rounded-2xl bg-zinc-950 shadow-xl shadow-zinc-950/15 dark:bg-zinc-800"><Image src="/finnri-logo.png" alt="Finnri" fill sizes="144px" className="scale-[2.35] object-contain" priority /></span>

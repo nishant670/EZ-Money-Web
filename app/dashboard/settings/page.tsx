@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Check, Globe, Loader2, LogOut, Save, ShieldAlert, User } from "lucide-react";
+import { Check, Globe, Loader2, LogOut, Monitor, Moon, Save, ShieldAlert, Sun, User } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { apiErrorMessage, UserAPI } from "@/app/lib/api";
+import { ThemePreference, useTheme } from "@/app/components/ui/ThemeProvider";
+import { useToast } from "@/app/components/ui/Toast";
 
 function nameParts(username = "") {
     const [firstName = "", ...rest] = username.trim().split(/\s+/);
@@ -12,6 +14,8 @@ function nameParts(username = "") {
 
 export default function SettingsScreen() {
     const { user, updateUser, logout, beginGuestClaim } = useAuth();
+    const { theme, setTheme } = useTheme();
+    const { toast } = useToast();
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [loading, setLoading] = useState(false);
@@ -49,6 +53,7 @@ export default function SettingsScreen() {
             const response = await UserAPI.updateProfile({ username });
             updateUser(response.data.user);
             setSuccess(true);
+            toast({ title: "Profile updated" });
         } catch (requestError) {
             setError(apiErrorMessage(requestError, "We couldn’t save your profile. Try again."));
         } finally {
@@ -77,7 +82,7 @@ export default function SettingsScreen() {
 
                 {user?.is_guest && <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100 sm:p-8"><div className="flex items-start gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"><ShieldAlert className="h-5 w-5" /></span><div><h2 className="font-bold">Save this guest workspace</h2><p className="mt-1 text-sm leading-6 opacity-75">Clearing this browser’s data, using a private window, or moving to another device can permanently lose its transactions, accounts, and splits.</p><button type="button" onClick={beginGuestClaim} className="mt-4 min-h-11 rounded-xl bg-amber-900 px-5 text-sm font-bold text-white dark:bg-amber-200 dark:text-amber-950">Save this workspace</button></div></div></section>}
 
-                <section className="rounded-[2.5rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900 sm:p-10">
+                <section className="rounded-[2rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900 sm:p-10">
                     <div className="mb-10 flex flex-col items-center gap-6 sm:flex-row">
                         <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[2rem] bg-accent-secondary text-3xl font-bold font-rounded text-accent shadow-xl shadow-accent/10" aria-hidden="true">
                             {firstName[0]?.toUpperCase()}{lastName[0]?.toUpperCase()}
@@ -114,6 +119,11 @@ export default function SettingsScreen() {
                             {loading ? "Saving…" : "Save Profile"}
                         </button>
                     </div>
+                </section>
+
+                <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
+                    <div className="mb-6 flex items-start gap-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 dark:bg-zinc-800"><Sun className="h-5 w-5" /></div><div><h2 className="text-lg font-bold font-rounded">Appearance</h2><p className="text-sm text-zinc-500">Choose a theme for this browser.</p></div></div>
+                    <div className="grid grid-cols-3 gap-3">{([{ value: "light", label: "Light", Icon: Sun }, { value: "dark", label: "Dark", Icon: Moon }, { value: "system", label: "System", Icon: Monitor }] as const).map(({ value, label, Icon }) => <button key={value} type="button" onClick={() => setTheme(value as ThemePreference)} aria-pressed={theme === value} className={`flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border text-sm font-bold transition-colors ${theme === value ? "border-accent bg-accent/10 text-accent" : "border-border bg-zinc-50 text-zinc-500 hover:border-accent/40 dark:bg-zinc-800"}`}><Icon className="h-5 w-5" />{label}</button>)}</div>
                 </section>
 
                 <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">

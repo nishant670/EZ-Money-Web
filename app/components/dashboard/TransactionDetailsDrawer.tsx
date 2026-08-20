@@ -15,9 +15,12 @@ import {
     Pencil,
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { apiErrorMessage, EntriesAPI, SplitAPI, SplitBill, Transaction } from "@/app/lib/api";
 import { formatDate, formatMoney, formatTime, toLocalISO } from "@/app/lib/format";
+import Dialog from "@/app/components/ui/Dialog";
+import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
+import { useToast } from "@/app/components/ui/Toast";
 
 interface TransactionDetailsDrawerProps {
     isOpen: boolean;
@@ -29,7 +32,11 @@ interface TransactionDetailsDrawerProps {
 }
 
 export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, transaction, reviewStatus, onEdit }: TransactionDetailsDrawerProps) {
+    const reduceMotion = useReducedMotion();
+    const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<"delete" | "duplicate" | null>(null);
+    const [error, setError] = useState("");
     const [splitResult, setSplitResult] = useState<{ entryID: number; bill: SplitBill | null; available: boolean } | null>(null);
 
     useEffect(() => {
@@ -52,23 +59,24 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
     const handleEdit = () => onEdit?.(transaction, splitBill, splitLoadState === "loaded");
 
     const handleDelete = async () => {
-        if (!confirm("Are you sure you want to delete this transaction?")) return;
         setLoading(true);
+        setError("");
         try {
             await EntriesAPI.delete(transaction.id);
+            toast({ title: `${transaction.merchant || transaction.title} deleted` });
             onChanged?.();
             onClose();
         } catch (err) {
-            console.error("Failed to delete", err);
-            alert(apiErrorMessage(err, "Failed to delete transaction."));
+            setError(apiErrorMessage(err, "Failed to delete transaction."));
             setLoading(false);
-        }
+        } finally { setConfirmAction(null); }
     };
 
     const handleDuplicate = async () => {
         setLoading(true);
+        setError("");
         try {
-            await EntriesAPI.create({
+            const response = await EntriesAPI.create({
                 title: `${transaction.merchant || transaction.title} (Copy)`,
                 merchant: transaction.merchant,
                 amount: transaction.amount,
@@ -85,36 +93,27 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
                 notes: transaction.notes,
                 account_id: transaction.account_id,
             });
+            toast({ title: `${response.data.merchant || response.data.title} duplicated` });
             onChanged?.();
             onClose();
         } catch (err) {
-            alert(apiErrorMessage(err, "Failed to duplicate transaction."));
+            setError(apiErrorMessage(err, "Failed to duplicate transaction."));
             setLoading(false);
-        }
+        } finally { setConfirmAction(null); }
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-[110] flex justify-end">
+        <>
+            <Dialog open={isOpen} onClose={onClose} labelledBy="transaction-details-title" className="justify-end p-0" panelClassName="h-dvh max-w-md rounded-none border-y-0 border-r-0">
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="absolute inset-0 bg-zinc-950/20 backdrop-blur-[2px]"
-                    />
-
-                    <motion.div
-                        initial={{ x: "100%" }}
+                        initial={reduceMotion ? false : { x: "100%" }}
                         animate={{ x: 0 }}
-                        exit={{ x: "100%" }}
-                        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="relative w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl h-screen flex flex-col border-l border-border"
+                        transition={reduceMotion ? { duration: 0 } : { type: "spring", damping: 25, stiffness: 200 }}
+                        className="flex h-dvh flex-col bg-card"
                     >
                         {/* Drawer Header */}
                         <div className="p-8 border-b border-border flex items-center justify-between">
-                            <h3 className="text-xl font-bold font-rounded">Transaction Details</h3>
+                            <h3 id="transaction-details-title" className="text-xl font-bold font-rounded">Transaction Details</h3>
                             <div className="flex items-center gap-2">
                                 <button onClick={onClose} className="p-2.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-xl transition-all"><X className="w-5 h-5" /></button>
                             </div>
@@ -174,6 +173,7 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
 
                         {/* Bottom Actions */}
                         <div className="p-8 border-t border-border bg-zinc-50 dark:bg-zinc-800/50 space-y-3">
+                            {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}
                             {onEdit && <button
                                 onClick={handleEdit}
                                 disabled={loading || splitLoadState === "loading"}
@@ -182,14 +182,14 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
                                 <Pencil className="w-4 h-4" /> {splitLoadState === "loading" ? "Loading details…" : "Edit Transaction"}
                             </button>}
                             <button
-                                onClick={handleDuplicate}
+                                onClick={() => setConfirmAction("duplicate")}
                                 disabled={loading}
                                 className="w-full flex items-center justify-center gap-3 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white py-4 rounded-2xl font-bold text-sm shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70"
                             >
                                 {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <><Copy className="w-4 h-4" /> Duplicate Transaction</>}
                             </button>
                             <button
-                                onClick={handleDelete}
+                                onClick={() => setConfirmAction("delete")}
                                 disabled={loading}
                                 className="w-full flex items-center justify-center gap-3 border border-red-500/20 text-red-500 py-4 rounded-2xl font-bold text-sm hover:bg-red-500/5 transition-all disabled:opacity-70"
                             >
@@ -197,8 +197,9 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
                             </button>
                         </div>
                     </motion.div>
-                </div>
-            )}
-        </AnimatePresence>
+            </Dialog>
+            <ConfirmDialog open={confirmAction === "delete"} title={`Delete ${transaction.merchant || transaction.title}?`} description="This permanently removes the financial record. It cannot be undone." confirmLabel="Delete permanently" busy={loading} onClose={() => setConfirmAction(null)} onConfirm={handleDelete} />
+            <ConfirmDialog open={confirmAction === "duplicate"} title={`Duplicate ${transaction.merchant || transaction.title}?`} description={`This will create another ${formatMoney(transaction.amount)} record dated today.`} confirmLabel="Create duplicate" destructive={false} busy={loading} onClose={() => setConfirmAction(null)} onConfirm={handleDuplicate} />
+        </>
     );
 }

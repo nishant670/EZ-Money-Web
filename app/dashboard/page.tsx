@@ -10,7 +10,6 @@ import {
     CircleAlert,
     Download,
     IndianRupee,
-    Loader2,
     Plus,
     RefreshCw,
     Sparkles,
@@ -28,6 +27,8 @@ import { formatDate, formatDateRange, formatMoney, toLocalISO } from "@/app/lib/
 import { downloadTransactionsCSV } from "@/app/lib/export-transactions";
 import { transactionHref } from "@/app/lib/transaction-links";
 import { cn } from "@/app/lib/utils";
+import { PageSkeleton } from "@/app/components/ui/Skeleton";
+import { useToast } from "@/app/components/ui/Toast";
 
 function rangeFor(preset: "month" | "30d" | "90d") {
     const end = new Date();
@@ -56,6 +57,7 @@ type TransactionEditDraft = {
 };
 
 export default function DashboardHome() {
+    const { toast } = useToast();
     const router = useRouter();
     const [preset, setPreset] = useState<"month" | "30d" | "90d">("month");
     const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
@@ -97,6 +99,7 @@ export default function DashboardHome() {
         setIsExporting(true);
         try {
             await downloadTransactionsCSV(transactionPeriod);
+            toast({ title: `${dashboard?.summary.transaction_count || 0} transaction${dashboard?.summary.transaction_count === 1 ? "" : "s"} exported` });
         } catch (requestError) {
             setExportError(apiErrorMessage(requestError, "We couldn’t export this overview period."));
         } finally {
@@ -134,8 +137,8 @@ export default function DashboardHome() {
                 {error && dashboard && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><div className="flex-1"><p>{error}</p><button onClick={() => void loadDashboard(true)} className="mt-2 font-bold underline">Try again</button></div></div>}
                 {exportError && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><p>{exportError}</p></div>}
 
-                {loading ? (
-                    <div className="grid min-h-[420px] place-items-center rounded-[2rem] border border-border bg-white dark:bg-zinc-900"><div className="text-center text-zinc-400"><Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-accent" /><p className="text-sm font-semibold">Calculating your latest view…</p></div></div>
+                {loading && !dashboard ? (
+                    <PageSkeleton />
                 ) : error && !dashboard ? (
                     <div className="rounded-[2rem] border border-red-200 bg-red-50 p-8 dark:border-red-900/40 dark:bg-red-950/20"><CircleAlert className="h-6 w-6 text-red-500" /><h2 className="mt-4 text-lg font-bold">Dashboard unavailable</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-red-700/70 dark:text-red-300/70">{error}</p><button onClick={() => void loadDashboard()} className="mt-5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white">Try again</button></div>
                 ) : !hasData ? <EmptyState onAdd={() => setIsModalOpen(true)} /> : dashboard && (
@@ -146,7 +149,7 @@ export default function DashboardHome() {
                                 { label: "Income", value: formatMoney(dashboard.summary.total_income), detail: "Confirmed income", icon: TrendingUp, tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
                                 { label: "Net cash flow", value: formatMoney(net), detail: net >= 0 ? "Positive for this period" : "Spending is above income", icon: WalletCards, tone: "text-accent bg-accent/10" },
                                 { label: "Daily average", value: formatMoney(dashboard.summary.daily_average), detail: "Expense pace", icon: IndianRupee, tone: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30" },
-                            ].map((card) => <article key={card.label} className="rounded-[1.75rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900"><div className={cn("grid h-11 w-11 place-items-center rounded-2xl", card.tone)}><card.icon className="h-5 w-5" /></div><p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">{card.label}</p><p className="mt-2 text-2xl font-bold tracking-tight font-rounded">{card.value}</p><p className="mt-1 text-xs text-zinc-500">{card.detail}</p></article>)}
+                            ].map((card) => <article key={card.label} className="rounded-[2rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900"><div className={cn("grid h-11 w-11 place-items-center rounded-2xl", card.tone)}><card.icon className="h-5 w-5" /></div><p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">{card.label}</p><p className="mt-2 text-2xl font-bold tracking-tight font-rounded">{card.value}</p><p className="mt-1 text-xs text-zinc-500">{card.detail}</p></article>)}
                         </section>
 
                         {topInsight && (
@@ -188,8 +191,8 @@ export default function DashboardHome() {
                                 {dailyChartData.length ? (
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={dailyChartData} margin={{ left: 4, right: 8, top: 8, bottom: 4 }}>
-                                            <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
-                                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
+                                            <CartesianGrid vertical={false} stroke="var(--chart-grid)" strokeDasharray="3 3" />
+                                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--chart-axis)" }} />
                                             <YAxis hide />
                                             <Tooltip cursor={{ fill: "var(--accent-secondary)" }} content={({ active, label }) => {
                                                 if (!active) return null;

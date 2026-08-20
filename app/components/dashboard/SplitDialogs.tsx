@@ -1,6 +1,6 @@
 "use client";
 
-import React, { FormEvent, ReactNode, useMemo, useState } from "react";
+import React, { FormEvent, ReactNode, useId, useMemo, useState } from "react";
 import { Equal, Loader2, Plus, Trash2, X } from "lucide-react";
 import {
     apiErrorMessage,
@@ -17,18 +17,19 @@ import {
     SplitSettlementInput,
 } from "@/app/lib/api";
 import { formatMoney, toLocalISO } from "@/app/lib/format";
+import Dialog from "@/app/components/ui/Dialog";
+import { useToast } from "@/app/components/ui/Toast";
 
 const fieldClass = "min-h-11 w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none focus:border-accent/30 focus:ring-4 focus:ring-accent/10 dark:bg-zinc-800";
 function DialogShell({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
-    return <div className="fixed inset-0 z-[120] grid place-items-center bg-zinc-950/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="split-dialog-title">
-        <div className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-border bg-white shadow-2xl dark:bg-zinc-900">
+    const titleId = useId();
+    return <Dialog open onClose={onClose} labelledBy={titleId} panelClassName="max-h-[calc(100dvh-2rem)] max-w-2xl">
             <div className="sticky top-0 z-10 flex items-start justify-between border-b border-border bg-white/95 p-6 backdrop-blur dark:bg-zinc-900/95">
-                <div><h2 id="split-dialog-title" className="text-xl font-bold font-rounded">{title}</h2><p className="mt-1 text-sm text-zinc-500">{description}</p></div>
+                <div><h2 id={titleId} className="text-xl font-bold font-rounded">{title}</h2><p className="mt-1 text-sm text-zinc-500">{description}</p></div>
                 <button type="button" onClick={onClose} className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
             {children}
-        </div>
-    </div>;
+    </Dialog>;
 }
 
 function DialogActions({ saving, label, onClose }: { saving: boolean; label: string; onClose: () => void }) {
@@ -39,12 +40,13 @@ function DialogActions({ saving, label, onClose }: { saving: boolean; label: str
 }
 
 export function FriendDialog({ friend, onClose, onSaved }: { friend?: SplitFriend; onClose: () => void; onSaved: () => void }) {
+    const { toast } = useToast();
     const [form, setForm] = useState<SplitFriendInput>({ name: friend?.name || "", email: friend?.email || "", phone: friend?.phone || "" });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const submit = async (event: FormEvent) => {
         event.preventDefault(); setSaving(true); setError("");
-        try { if (friend) await SplitAPI.updateFriend(friend.id, form); else await SplitAPI.createFriend(form); onSaved(); }
+        try { if (friend) await SplitAPI.updateFriend(friend.id, form); else await SplitAPI.createFriend(form); toast({ title: friend ? `${form.name} updated` : `${form.name} added` }); onSaved(); }
         catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t save this friend.")); }
         finally { setSaving(false); }
     };
@@ -59,13 +61,14 @@ export function FriendDialog({ friend, onClose, onSaved }: { friend?: SplitFrien
 }
 
 export function GroupDialog({ group, friends, onClose, onSaved }: { group?: SplitGroup; friends: SplitFriend[]; onClose: () => void; onSaved: () => void }) {
+    const { toast } = useToast();
     const [form, setForm] = useState<SplitGroupInput>({ name: group?.name || "", friend_ids: group?.members?.map((member) => member.friend_id) || [] });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const toggleFriend = (friendID: number) => setForm({ ...form, friend_ids: form.friend_ids.includes(friendID) ? form.friend_ids.filter((id) => id !== friendID) : [...form.friend_ids, friendID] });
     const submit = async (event: FormEvent) => {
         event.preventDefault(); setSaving(true); setError("");
-        try { if (group) await SplitAPI.updateGroup(group.id, form); else await SplitAPI.createGroup(form); onSaved(); }
+        try { if (group) await SplitAPI.updateGroup(group.id, form); else await SplitAPI.createGroup(form); toast({ title: group ? `${form.name} updated` : `${form.name} created` }); onSaved(); }
         catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t save this group.")); }
         finally { setSaving(false); }
     };
@@ -83,6 +86,7 @@ type BillDraft = Omit<SplitBillInput, "participants"> & { participants: SplitPar
 function emptyParticipant(): SplitParticipantInput { return { friend_id: 0, share_amount: 0, direction: "friend_owes_user" }; }
 
 export function BillDialog({ bill, friends, groups, onClose, onSaved }: { bill?: SplitBill; friends: SplitFriend[]; groups: SplitGroup[]; onClose: () => void; onSaved: () => void }) {
+    const { toast } = useToast();
     const [form, setForm] = useState<BillDraft>({
         entry_id: bill?.entry_id || null, group_id: bill?.group_id || null, title: bill?.title || "", total_amount: bill?.total_amount || 0,
         currency: "INR", date: bill?.date || toLocalISO(), notes: bill?.notes || "",
@@ -109,7 +113,7 @@ export function BillDialog({ bill, friends, groups, onClose, onSaved }: { bill?:
         if (form.participants.some((participant) => !participant.friend_id || participant.share_amount <= 0)) { setError("Choose a friend and positive share for every participant."); return; }
         if (sharesTotal > Number(form.total_amount)) { setError("Friend shares cannot exceed the total bill amount."); return; }
         setSaving(true); setError("");
-        try { if (bill) await SplitAPI.updateBill(bill.id, form); else await SplitAPI.createBill(form); onSaved(); }
+        try { if (bill) await SplitAPI.updateBill(bill.id, form); else await SplitAPI.createBill(form); toast({ title: bill ? `${form.title} updated` : `${form.title} saved` }); onSaved(); }
         catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t save this split bill.")); }
         finally { setSaving(false); }
     };
@@ -132,12 +136,13 @@ export function BillDialog({ bill, friends, groups, onClose, onSaved }: { bill?:
 }
 
 export function SettlementDialog({ friends, suggestedFriend, onClose, onSaved }: { friends: SplitFriend[]; suggestedFriend?: SplitFriend; onClose: () => void; onSaved: () => void }) {
+    const { toast } = useToast();
     const [form, setForm] = useState<SplitSettlementInput>({ friend_id: suggestedFriend?.id || 0, amount: 0, direction: "friend_paid_user", date: toLocalISO(), notes: "" });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const submit = async (event: FormEvent) => {
         event.preventDefault(); setSaving(true); setError("");
-        try { await SplitAPI.createSettlement(form); onSaved(); }
+        try { await SplitAPI.createSettlement(form); const friend = friends.find((item) => item.id === form.friend_id); toast({ title: `${formatMoney(form.amount)} settlement recorded${friend ? ` with ${friend.name}` : ""}` }); onSaved(); }
         catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t record this settlement.")); }
         finally { setSaving(false); }
     };

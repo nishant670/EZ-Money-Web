@@ -11,7 +11,6 @@ import {
     Download,
     IndianRupee,
     Landmark,
-    Loader2,
     RefreshCw,
     Store,
     Tags,
@@ -24,12 +23,15 @@ import { formatMoney } from "@/app/lib/format";
 import { downloadTransactionsCSV } from "@/app/lib/export-transactions";
 import { transactionHref } from "@/app/lib/transaction-links";
 import { cn } from "@/app/lib/utils";
+import { PageSkeleton } from "@/app/components/ui/Skeleton";
+import { useToast } from "@/app/components/ui/Toast";
 
 function EmptyPanel({ label }: { label: string }) {
     return <div className="grid min-h-52 place-items-center rounded-2xl bg-zinc-50 p-6 text-center text-sm font-semibold text-zinc-400 dark:bg-zinc-800">{label}</div>;
 }
 
 export default function ReportsScreen() {
+    const { toast } = useToast();
     const router = useRouter();
     const [report, setReport] = useState<TransactionReportResponse | null>(null);
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -85,6 +87,7 @@ export default function ReportsScreen() {
         setIsExporting(true);
         try {
             await downloadTransactionsCSV(entryParams());
+            toast({ title: `${report?.summary.transaction_count || 0} report row${report?.summary.transaction_count === 1 ? "" : "s"} exported` });
         } catch (requestError) {
             setExportError(apiErrorMessage(requestError, "We couldn’t export these report rows."));
         } finally {
@@ -106,12 +109,11 @@ export default function ReportsScreen() {
 
                 <TransactionFilterPanel controller={filterController} accounts={accounts} searchLabel="Search reports" />
                 {exportError && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><p>{exportError}</p></div>}
+                {error && report && <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">{error} <button onClick={() => void loadReport()} className="ml-2 font-bold underline">Try again</button></div>}
 
-                {loading ? (
-                    <div className="grid min-h-[520px] place-items-center rounded-[2rem] border border-border bg-white dark:bg-zinc-900">
-                        <div className="text-center"><Loader2 className="mx-auto mb-3 h-7 w-7 animate-spin text-accent" /><p className="text-sm font-semibold text-zinc-400">Building report rollups...</p></div>
-                    </div>
-                ) : error ? (
+                {loading && !report ? (
+                    <PageSkeleton />
+                ) : error && !report ? (
                     <div className="rounded-[2rem] border border-red-200 bg-red-50 p-8 dark:border-red-900/40 dark:bg-red-950/20"><CircleAlert className="h-6 w-6 text-red-500" /><h2 className="mt-4 text-lg font-bold">Reports unavailable</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-red-700/70 dark:text-red-300/70">{error}</p><button onClick={() => void loadReport()} className="mt-5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white">Try again</button></div>
                 ) : report && (
                     <>
@@ -122,7 +124,7 @@ export default function ReportsScreen() {
                                 { label: "Net cash flow", value: formatMoney(report.summary.net_cashflow), detail: report.summary.net_cashflow >= 0 ? "Income above expense" : "Expense above income", icon: Landmark, tone: "text-accent bg-accent/10" },
                                 { label: "Records", value: report.summary.transaction_count.toLocaleString("en-IN"), detail: "Matching filters", icon: IndianRupee, tone: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30" },
                             ].map((card) => (
-                                <article key={card.label} className="rounded-[1.75rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900">
+                                <article key={card.label} className="rounded-[2rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900">
                                     <div className={cn("grid h-11 w-11 place-items-center rounded-2xl", card.tone)}><card.icon className="h-5 w-5" /></div>
                                     <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">{card.label}</p>
                                     <p className="mt-2 break-words text-2xl font-bold tracking-tight font-rounded">{card.value}</p>
@@ -139,7 +141,7 @@ export default function ReportsScreen() {
                                     <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
                                         <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/10 text-accent"><Tags className="h-4 w-4" /></span><div><h2 className="font-bold font-rounded">Category mix</h2><p className="text-xs text-zinc-400">Expense distribution · select a bar to inspect</p></div></div>
                                         <div className="mt-7 h-[320px] min-w-0">
-                                            {categoryChart.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={categoryChart} layout="vertical" margin={{ left: 8, right: 8 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" /><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={116} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--text-muted)" }} /><Tooltip formatter={(value) => formatMoney(Number(value))} cursor={{ fill: "var(--accent-secondary)" }} contentStyle={{ borderRadius: 16, border: "1px solid var(--border)", background: "var(--card)", color: "var(--foreground)" }} /><Bar dataKey="amount" fill="var(--accent)" radius={[0, 8, 8, 0]} barSize={24} className="cursor-pointer" onClick={(item) => { if (item.payload?.name) router.push(drilldownHref({ type: "expense", category: item.payload.name })); }} /></BarChart></ResponsiveContainer> : <EmptyPanel label="No expense categories in this range." />}
+                                            {categoryChart.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={categoryChart} layout="vertical" margin={{ left: 8, right: 8 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--chart-grid)" /><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={116} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--chart-axis)" }} /><Tooltip formatter={(value) => formatMoney(Number(value))} cursor={{ fill: "var(--accent-secondary)" }} contentStyle={{ borderRadius: 16, border: "1px solid var(--border)", background: "var(--chart-tooltip)", color: "var(--foreground)" }} /><Bar dataKey="amount" fill="var(--accent)" radius={[0, 8, 8, 0]} barSize={24} className="cursor-pointer" onClick={(item) => { if (item.payload?.name) router.push(drilldownHref({ type: "expense", category: item.payload.name })); }} /></BarChart></ResponsiveContainer> : <EmptyPanel label="No expense categories in this range." />}
                                         </div>
                                     </div>
                                     <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
@@ -152,7 +154,7 @@ export default function ReportsScreen() {
                                     <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
                                         <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30"><CalendarRange className="h-4 w-4" /></span><div><h2 className="font-bold font-rounded">Monthly trend</h2><p className="text-xs text-zinc-400">Expense and income over time</p></div></div>
                                         <div className="mt-7 h-[300px] min-w-0">
-                                            {monthChart.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={monthChart} margin={{ left: 4, right: 12, top: 8, bottom: 4 }}><CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--text-muted)" }} /><YAxis hide /><Tooltip formatter={(value) => formatMoney(Number(value))} contentStyle={{ borderRadius: 16, border: "1px solid var(--border)", background: "var(--card)", color: "var(--foreground)" }} /><Line type="monotone" dataKey="expense" stroke="var(--accent)" strokeWidth={3} dot={{ r: 3 }} /><Line type="monotone" dataKey="income" stroke="#16a34a" strokeWidth={3} dot={{ r: 3 }} /></LineChart></ResponsiveContainer> : <EmptyPanel label="Monthly trend appears after dated records." />}
+                                            {monthChart.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={monthChart} margin={{ left: 4, right: 12, top: 8, bottom: 4 }}><CartesianGrid vertical={false} stroke="var(--chart-grid)" strokeDasharray="3 3" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--chart-axis)" }} /><YAxis hide /><Tooltip formatter={(value) => formatMoney(Number(value))} contentStyle={{ borderRadius: 16, border: "1px solid var(--border)", background: "var(--chart-tooltip)", color: "var(--foreground)" }} /><Line type="monotone" dataKey="expense" stroke="var(--accent)" strokeWidth={3} dot={{ r: 3 }} /><Line type="monotone" dataKey="income" stroke="var(--chart-positive)" strokeWidth={3} dot={{ r: 3 }} /></LineChart></ResponsiveContainer> : <EmptyPanel label="Monthly trend appears after dated records." />}
                                         </div>
                                     </div>
                                     <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">

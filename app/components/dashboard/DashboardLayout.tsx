@@ -58,6 +58,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [globalSearch, setGlobalSearch] = useState("");
     const [guestPromptDismissed, setGuestPromptDismissed] = useState(false);
     const notificationPanelRef = useRef<HTMLDivElement | null>(null);
+    const menuButtonRef = useRef<HTMLButtonElement | null>(null);
     const pathname = usePathname();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -103,6 +104,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return () => document.removeEventListener("mousedown", handleClick);
     }, []);
 
+    useEffect(() => {
+        if (!isSidebarOpen) return;
+        const menuButton = menuButtonRef.current;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") { setIsSidebarOpen(false); menuButtonRef.current?.focus(); }
+        };
+        document.addEventListener("keydown", onKeyDown);
+        return () => { document.removeEventListener("keydown", onKeyDown); document.body.style.overflow = previousOverflow; menuButton?.focus(); };
+    }, [isSidebarOpen]);
+
     const handleSearch = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const query = String(new FormData(event.currentTarget).get("q") || "").trim();
@@ -129,6 +142,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return (
         <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-white lg:flex">
+            <a href="#dashboard-content" className="fixed left-4 top-3 z-[180] -translate-y-20 rounded-xl bg-accent px-4 py-3 text-sm font-bold text-white transition-transform focus:translate-y-0">Skip to content</a>
             {isSidebarOpen && (
                 <button
                     className="fixed inset-0 z-40 bg-zinc-950/30 lg:hidden"
@@ -136,7 +150,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
-            <aside className={cn(
+            <aside id="dashboard-sidebar" className={cn(
                 "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-white transition-transform dark:bg-zinc-900 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
                 isSidebarOpen ? "translate-x-0" : "-translate-x-full",
             )}>
@@ -196,7 +210,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             <div className="min-w-0 flex-1">
                 <header className="sticky top-0 z-30 flex h-20 items-center gap-4 border-b border-border bg-white/90 px-4 backdrop-blur-xl dark:bg-zinc-900/90 sm:px-6 lg:px-8">
-                    <button className="rounded-xl p-2 text-zinc-500 lg:hidden" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation">
+                    <button ref={menuButtonRef} className="rounded-xl p-2 text-zinc-500 lg:hidden" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation" aria-expanded={isSidebarOpen} aria-controls="dashboard-sidebar">
                         <Menu className="h-5 w-5" />
                     </button>
                     <form onSubmit={handleSearch} className="relative max-w-xl flex-1">
@@ -246,7 +260,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         )}
                     </div>
                 </header>
-                <main className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">{children}</main>
+                <main id="dashboard-content" tabIndex={-1} className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">{children}</main>
             </div>
             <GuestClaimModal />
         </div>

@@ -8,7 +8,6 @@ import {
     CalendarRange,
     CircleHelp,
     Clock3,
-    Loader2,
     RefreshCw,
     Repeat2,
 } from "lucide-react";
@@ -16,6 +15,7 @@ import DashboardInsightCard from "@/app/components/dashboard/DashboardInsightCar
 import { apiErrorMessage, DashboardAPI, DashboardResponse } from "@/app/lib/api";
 import { formatDate, formatMoney, toLocalISO } from "@/app/lib/format";
 import { cn } from "@/app/lib/utils";
+import { PageSkeleton } from "@/app/components/ui/Skeleton";
 
 function currentMonthStart() {
     const date = new Date();
@@ -66,9 +66,11 @@ export default function InsightsScreen() {
                     </div>
                 </header>
 
-                {loading ? (
-                    <div className="grid min-h-[520px] place-items-center rounded-[2rem] border border-border bg-white dark:bg-zinc-900"><div className="text-center"><Loader2 className="mx-auto mb-3 h-7 w-7 animate-spin text-accent" /><p className="text-sm font-semibold text-zinc-400">Comparing this period with the previous one…</p></div></div>
-                ) : error ? (
+                {error && dashboard && <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">{error} <button onClick={() => void loadInsights()} className="ml-2 font-bold underline">Try again</button></div>}
+
+                {loading && !dashboard ? (
+                    <PageSkeleton />
+                ) : error && !dashboard ? (
                     <div className="rounded-[2rem] border border-red-200 bg-red-50 p-8 dark:border-red-900/40 dark:bg-red-950/20"><AlertTriangle className="h-6 w-6 text-red-500" /><h2 className="mt-3 text-lg font-bold">Insights unavailable</h2><p className="mt-2 text-sm text-red-700/70 dark:text-red-300/70">{error}</p><button onClick={() => void loadInsights()} className="mt-5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white">Try again</button></div>
                 ) : dashboard && (
                     <>
@@ -76,7 +78,7 @@ export default function InsightsScreen() {
 
                         <section>
                             <div className="mb-4 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">What changed</p><h2 className="mt-1 text-xl font-bold font-rounded">Insight cards</h2></div><span className="text-xs text-zinc-400">Compared with the preceding equal-length period</span></div>
-                            {dashboard.insights.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{dashboard.insights.map((insight) => <DashboardInsightCard key={`${insight.kind}-${insight.title}`} insight={insight} period={{ start_date: startDate, end_date: endDate }} />)}</div> : <div className="rounded-[1.75rem] border border-dashed border-border p-8 text-center text-sm text-zinc-400">Add more transactions to unlock comparisons and patterns.</div>}
+                            {dashboard.insights.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{dashboard.insights.map((insight) => <DashboardInsightCard key={`${insight.kind}-${insight.title}`} insight={insight} period={{ start_date: startDate, end_date: endDate }} />)}</div> : <div className="rounded-[2rem] border border-dashed border-border p-8 text-center text-sm text-zinc-400">Add more transactions to unlock comparisons and patterns.</div>}
                         </section>
 
                         <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">

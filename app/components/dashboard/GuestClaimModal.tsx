@@ -4,6 +4,7 @@ import React, { FormEvent, useEffect, useState } from "react";
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Lock, Mail, Phone, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { apiErrorMessage, AuthAPI } from "@/app/lib/api";
+import Dialog from "@/app/components/ui/Dialog";
 
 type Step = "identifier" | "otp" | "pin" | "done";
 
@@ -96,8 +97,7 @@ export default function GuestClaimModal() {
     };
 
     return (
-        <div className="fixed inset-0 z-[140] grid place-items-center bg-zinc-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="guest-claim-title">
-            <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-border bg-white shadow-2xl dark:bg-zinc-900">
+        <Dialog open={isGuestClaimOpen} onClose={closeGuestClaim} labelledBy="guest-claim-title" className="z-[140]" panelClassName="max-h-[calc(100dvh-2rem)] max-w-md">
                 <header className="flex items-start justify-between gap-4 border-b border-border p-6">
                     <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Keep your data</p><h2 id="guest-claim-title" className="mt-2 text-2xl font-bold font-rounded">Save this workspace</h2></div>
                     <button type="button" onClick={closeGuestClaim} className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Close save workspace"><X className="h-5 w-5" /></button>
@@ -132,7 +132,6 @@ export default function GuestClaimModal() {
 
                     {step === "done" && <div className="text-center"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30"><CheckCircle2 className="h-7 w-7" /></span><h3 className="mt-4 text-xl font-bold">Workspace saved</h3><p className="mt-2 text-sm leading-6 text-zinc-500">Your transactions, accounts, and splits stayed here. You can now sign in with {identifier} on another device.</p><button type="button" onClick={closeGuestClaim} className="mt-6 min-h-12 w-full rounded-xl bg-accent font-bold text-white">Continue in dashboard</button></div>}
                 </div>
-            </div>
-        </div>
+        </Dialog>
     );
 }

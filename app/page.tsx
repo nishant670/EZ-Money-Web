@@ -26,9 +26,11 @@ export default function Home() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      const next = window.scrollY > 20;
+      setScrolled((current) => current === next ? current : next);
     };
-    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -257,7 +259,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="relative aspect-square bg-gradient-to-br from-accent/20 to-transparent rounded-[3rem] border border-white/10 p-12 flex flex-col justify-between overflow-hidden">
+            <div className="relative aspect-square bg-gradient-to-br from-accent/20 to-transparent rounded-[2rem] border border-white/10 p-12 flex flex-col justify-between overflow-hidden">
               <div className="space-y-4 relative z-10">
                 <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/20 animate-float">
                   <div className="flex justify-between items-center mb-4">
@@ -300,7 +302,7 @@ export default function Home() {
       {/* Web Dashboard Section */}
       <section className="py-24 bg-accent/5 overflow-hidden">
         <div className="container mx-auto px-6">
-          <div className="bg-white dark:bg-zinc-800 rounded-[3rem] p-8 lg:p-16 border border-border shadow-2xl relative">
+          <div className="bg-white dark:bg-zinc-800 rounded-[2rem] p-8 lg:p-16 border border-border shadow-2xl relative">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
                 <h2 className="text-3xl lg:text-4xl font-bold mb-6 font-rounded">Analyze on the big screen.</h2>
@@ -364,7 +366,7 @@ export default function Home() {
       {/* Security Section */}
       <section id="security" className="py-24">
         <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto bg-white dark:bg-zinc-900 border border-border rounded-[3rem] overflow-hidden flex flex-col md:flex-row shadow-sm">
+          <div className="max-w-4xl mx-auto bg-white dark:bg-zinc-900 border border-border rounded-[2rem] overflow-hidden flex flex-col md:flex-row shadow-sm">
             <div className="md:w-1/2 p-12 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center">
               <div className="relative">
                 <div className="absolute inset-0 bg-accent/20 blur-3xl rounded-full" />
@@ -460,7 +462,7 @@ export default function Home() {
       {/* Footer CTA */}
       <section id="get-started" className="py-24 px-6">
         <div className="container mx-auto">
-          <div className="bg-accent rounded-[3rem] p-12 lg:p-24 text-center text-white relative overflow-hidden shadow-2xl shadow-accent/40">
+          <div className="bg-accent rounded-[2rem] p-12 lg:p-24 text-center text-white relative overflow-hidden shadow-2xl shadow-accent/40">
             {/* Decorative circles */}
             <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
             <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-black/10 rounded-full blur-3xl" />

@@ -16,13 +16,15 @@ import {
     Loader2
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Account, AccountsAPI, apiErrorMessage, asEntitlementError, EntitlementError, EntriesAPI, EntrySplitInput, SplitAPI, SplitBill, SplitFriend, SplitGroup, Transaction, TransactionInput } from "@/app/lib/api";
 import { PAYMENT_MODES, PaymentMode, paymentModeForAccountType, resolvePaymentMode } from "@/app/lib/accounts";
 import { categoryOptionsFor, loadCategories } from "@/app/lib/categories";
-import { toApiTime, toLocalISO } from "@/app/lib/format";
+import { formatMoney, toApiTime, toLocalISO } from "@/app/lib/format";
 import InlineSplitEditor from "@/app/components/dashboard/InlineSplitEditor";
 import Paywall from "@/app/components/Paywall";
+import Dialog from "@/app/components/ui/Dialog";
+import { useToast } from "@/app/components/ui/Toast";
 
 type DraftField = "type" | "amount" | "title" | "category" | "date" | "account" | "tags" | "notes";
 
@@ -77,6 +79,8 @@ function entrySplitFromBill(bill: SplitBill | null | undefined): EntrySplitInput
 }
 
 export default function AddTransactionModal({ isOpen, onClose, transaction = null, linkedSplitBill = null, splitDataAvailable = true, onSaved }: AddTransactionModalProps) {
+    const reduceMotion = useReducedMotion();
+    const { toast } = useToast();
     const isEditing = Boolean(transaction);
     const [mode, setMode] = useState<"quick" | "manual">("quick");
     const [extracting, setExtracting] = useState(false);
@@ -375,6 +379,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                 : await EntriesAPI.create(payload);
             await onSaved?.(response.data);
             setSuccess(true);
+            toast({ title: transaction ? `${title} updated` : `${title} ${formatMoney(numericAmount)} saved` });
             setTimeout(() => {
                 onClose();
                 resetForm();
@@ -399,30 +404,20 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+        <Dialog open={isOpen} onClose={onClose} labelledBy="transaction-dialog-title" panelClassName="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-hidden sm:max-h-[90dvh]">
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm"
-                    />
-
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                        initial={reduceMotion ? false : { scale: 0.96, opacity: 0, y: 16 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                        className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-[3rem] shadow-2xl overflow-hidden border border-border max-h-[90vh] overflow-y-auto"
+                        transition={reduceMotion ? { duration: 0 } : undefined}
+                        className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card sm:max-h-[90dvh]"
                     >
                         {/* Header */}
                         <div className="p-8 border-b border-border flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50 sticky top-0 z-10 backdrop-blur-md">
                             <div>
-                                <h3 className="text-2xl font-bold font-rounded">{isEditing ? "Edit Transaction" : "Add Transaction"}</h3>
+                                <h3 id="transaction-dialog-title" className="text-2xl font-bold font-rounded">{isEditing ? "Edit Transaction" : "Add Transaction"}</h3>
                                 <p className="text-sm text-zinc-500 font-medium">{isEditing ? "Correct the confirmed record and keep every surface in sync." : "Capture your expenses & income instantly."}</p>
                             </div>
-                            <button onClick={onClose} className="p-3 bg-white dark:bg-zinc-700 rounded-2xl hover:text-accent transition-colors shadow-sm">
+                            <button onClick={onClose} aria-label="Close transaction dialog" className="p-3 bg-white dark:bg-zinc-700 rounded-2xl hover:text-accent transition-colors shadow-sm">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
@@ -623,9 +618,9 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Tags<FieldStatus field="tags" /></label>
                                         <div className="flex flex-wrap gap-2">
                                             {tags.map((tag, i) => (
-                                                <span key={i} onClick={() => { setTags(tags.filter(t => t !== tag)); markFieldChanged("tags"); }} className="flex items-center gap-1.5 px-3 py-1 bg-accent/10 text-accent text-xs font-bold rounded-lg group cursor-pointer hover:bg-red-500/10 hover:text-red-500 transition-colors">
+                                                <button type="button" aria-label={`Remove tag ${tag}`} key={i} onClick={() => { setTags(tags.filter(t => t !== tag)); markFieldChanged("tags"); }} className="flex items-center gap-1.5 px-3 py-1 bg-accent/10 text-accent text-xs font-bold rounded-lg group cursor-pointer hover:bg-red-500/10 hover:text-red-500 transition-colors">
                                                     <Tag className="w-3 h-3" /> {tag} <X className="w-2.5 h-2.5 ml-1" />
-                                                </span>
+                                                </button>
                                             ))}
                                             {showTagInput ? (
                                                 <div className="flex items-center gap-2">
@@ -687,8 +682,6 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                             </div>
                         </div>
                     </motion.div>
-                </div>
-            )}
-        </AnimatePresence>
+        </Dialog>
     );
 }
