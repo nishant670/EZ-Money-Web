@@ -1,8 +1,8 @@
 "use client";
 
-import React, { FormEvent, useEffect, useRef, useState } from "react";
+import React, { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
     BarChart3,
@@ -16,6 +16,7 @@ import {
     LogOut,
     Menu,
     Search,
+    ShieldAlert,
     Settings,
     TableProperties,
     Wallet,
@@ -25,15 +26,16 @@ import { cn } from "@/app/lib/utils";
 import { useAuth } from "@/app/context/AuthContext";
 import { AppNotification, NotificationsAPI } from "@/app/lib/api";
 import { formatDate } from "@/app/lib/format";
+import GuestClaimModal from "@/app/components/dashboard/GuestClaimModal";
 
 const NAV_ITEMS = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Transactions", href: "/dashboard/transactions", icon: TableProperties },
     { name: "Insights", href: "/dashboard/insights", icon: BarChart3 },
     { name: "Reports", href: "/dashboard/reports", icon: ChartNoAxesColumnIncreasing },
-    { name: "Transactions", href: "/dashboard/transactions", icon: TableProperties },
+    { name: "Planning & tools", href: "/dashboard/tools", icon: Calculator },
     { name: "Accounts", href: "/dashboard/accounts", icon: Wallet },
     { name: "Splits", href: "/dashboard/splits", icon: HandCoins },
-    { name: "Planning & tools", href: "/dashboard/tools", icon: Calculator },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -54,12 +56,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [unreadCount, setUnreadCount] = useState(0);
     const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
     const [globalSearch, setGlobalSearch] = useState("");
+    const [guestPromptDismissed, setGuestPromptDismissed] = useState(false);
     const notificationPanelRef = useRef<HTMLDivElement | null>(null);
     const pathname = usePathname();
     const router = useRouter();
-    const { user, token, isLoading, logout } = useAuth();
+    const searchParams = useSearchParams();
+    const transactionQuery = pathname.startsWith("/dashboard/transactions") ? searchParams.get("q") || "" : "";
+    const { user, token, isLoading, logout, beginGuestClaim } = useAuth();
 
-    const loadNotifications = async () => {
+    useEffect(() => {
+        setGuestPromptDismissed(sessionStorage.getItem("finnri_guest_prompt_dismissed") === "1");
+    }, []);
+
+    const loadNotifications = useCallback(async () => {
         setIsNotificationsLoading(true);
         try {
             const response = await NotificationsAPI.list("all");
@@ -70,7 +79,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         } finally {
             setIsNotificationsLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         if (!isLoading && !token) router.replace("/login");
@@ -78,7 +87,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     useEffect(() => {
         if (token) void loadNotifications();
-    }, [pathname, token]);
+    }, [loadNotifications, token]);
+
+    useEffect(() => {
+        setGlobalSearch(transactionQuery);
+    }, [transactionQuery]);
 
     useEffect(() => {
         const handleClick = (event: MouseEvent) => {
@@ -90,10 +103,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return () => document.removeEventListener("mousedown", handleClick);
     }, []);
 
-    const handleSearch = (event: FormEvent) => {
+    const handleSearch = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const query = globalSearch.trim();
-        router.push(query ? `/dashboard/transactions?q=${encodeURIComponent(query)}` : "/dashboard/transactions");
+        const query = String(new FormData(event.currentTarget).get("q") || "").trim();
+        const next = pathname.startsWith("/dashboard/transactions")
+            ? new URLSearchParams(searchParams.toString())
+            : new URLSearchParams();
+        if (query) next.set("q", query);
+        else next.delete("q");
+        next.delete("page");
+        router.push(next.size ? `/dashboard/transactions?${next.toString()}` : "/dashboard/transactions");
     };
 
     const openNotification = async (notification: AppNotification) => {
@@ -141,6 +160,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <Link
                                 key={item.href}
                                 href={item.href}
+                                aria-current={active ? "page" : undefined}
                                 onClick={() => setIsSidebarOpen(false)}
                                 className={cn(
                                     "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
@@ -155,6 +175,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </nav>
 
                 <div className="border-t border-border p-4">
+                    {user?.is_guest && !guestPromptDismissed && <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+                        <div className="flex items-start gap-2"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><div className="min-w-0 flex-1"><p className="text-xs font-bold">Save this workspace</p><p className="mt-1 text-[11px] leading-4 opacity-75">Clearing browser data or switching devices can permanently lose this guest data.</p></div><button type="button" onClick={() => { sessionStorage.setItem("finnri_guest_prompt_dismissed", "1"); setGuestPromptDismissed(true); }} className="rounded p-1 opacity-60 hover:opacity-100" aria-label="Dismiss save workspace prompt"><X className="h-3.5 w-3.5" /></button></div>
+                        <button type="button" onClick={beginGuestClaim} className="mt-3 min-h-9 w-full rounded-xl bg-amber-900 px-3 text-xs font-bold text-white dark:bg-amber-200 dark:text-amber-950">Save workspace</button>
+                    </div>}
                     <div className="mb-3 flex items-center gap-3 rounded-2xl bg-zinc-50 p-3 dark:bg-zinc-800">
                         <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/10 text-sm font-bold text-accent">
                             {(user?.username || "G").slice(0, 1).toUpperCase()}
@@ -178,12 +202,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <form onSubmit={handleSearch} className="relative max-w-xl flex-1">
                         <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
                         <input
+                            name="q"
                             value={globalSearch}
                             onChange={(event) => setGlobalSearch(event.target.value)}
                             placeholder="Search transactions…"
                             aria-label="Search transactions"
-                            className="w-full rounded-2xl border border-transparent bg-zinc-100 py-2.5 pl-11 pr-4 text-sm outline-none transition focus:border-accent/30 focus:bg-white focus:ring-4 focus:ring-accent/10 dark:bg-zinc-800 dark:focus:bg-zinc-900"
+                            className="w-full rounded-2xl border border-transparent bg-zinc-100 py-2.5 pl-11 pr-20 text-sm outline-none transition focus:border-accent/30 focus:bg-white focus:ring-4 focus:ring-accent/10 dark:bg-zinc-800 dark:focus:bg-zinc-900"
                         />
+                        <button type="submit" className="absolute right-1.5 top-1/2 min-h-8 -translate-y-1/2 rounded-xl bg-zinc-900 px-3 text-[11px] font-bold text-white dark:bg-white dark:text-zinc-900" aria-label="Run transaction search">Search</button>
                     </form>
 
                     <div className="relative" ref={notificationPanelRef}>
@@ -222,6 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </header>
                 <main className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">{children}</main>
             </div>
+            <GuestClaimModal />
         </div>
     );
 }

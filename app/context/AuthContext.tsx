@@ -12,6 +12,10 @@ interface AuthContextType {
     updateUser: (user: User) => void;
     logout: () => void;
     loginAsGuest: () => Promise<void>;
+    isGuestClaimOpen: boolean;
+    beginGuestClaim: () => void;
+    closeGuestClaim: () => void;
+    claimGuest: (claimToken: string, pin: string) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,6 +26,10 @@ const AuthContext = createContext<AuthContextType>({
     updateUser: () => { },
     logout: () => { },
     loginAsGuest: async () => { },
+    isGuestClaimOpen: false,
+    beginGuestClaim: () => { },
+    closeGuestClaim: () => { },
+    claimGuest: async () => { throw new Error("No guest workspace to claim"); },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -30,6 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isGuestClaimOpen, setIsGuestClaimOpen] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -97,8 +106,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const claimGuest = async (claimToken: string, pin: string) => {
+        if (!user?.is_guest) throw new Error("No guest workspace to claim");
+        const storedDeviceId = localStorage.getItem("finnri_web_device_id");
+        const deviceId = storedDeviceId || `web_${crypto.randomUUID()}`;
+        localStorage.setItem("finnri_web_device_id", deviceId);
+        const response = await AuthAPI.register({
+            claim_token: claimToken,
+            pin,
+            guest_uuid: user.uuid,
+            device_id: deviceId,
+            biometrics_enabled: false,
+        });
+        login(response.data.token, response.data.user);
+        return response.data.user;
+    };
+
     return (
-        <AuthContext.Provider value={{ user, token, isLoading, login, updateUser, logout, loginAsGuest }}>
+        <AuthContext.Provider value={{ user, token, isLoading, login, updateUser, logout, loginAsGuest, isGuestClaimOpen, beginGuestClaim: () => setIsGuestClaimOpen(true), closeGuestClaim: () => setIsGuestClaimOpen(false), claimGuest }}>
             {children}
         </AuthContext.Provider>
     );

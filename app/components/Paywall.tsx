@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Clock3, Sparkles } from "lucide-react";
 import { EntitlementError } from "@/app/lib/api";
 import { formatTime } from "@/app/lib/format";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface PaywallProps {
     error: EntitlementError;
@@ -12,6 +13,7 @@ interface PaywallProps {
 }
 
 export default function Paywall({ error, featureLabel, compact = false }: PaywallProps) {
+    const { user, beginGuestClaim } = useAuth();
     const feature = error.featureLabel || featureLabel || "This feature";
     const resetTime = error.resetAt ? formatTime(error.resetAt) : null;
     const allowancePaused = error.status === 429;
@@ -40,7 +42,12 @@ export default function Paywall({ error, featureLabel, compact = false }: Paywal
                     {error.availableCredits != null ? ` · ${error.availableCredits} available` : ""}
                 </p>
             )}
-            {!allowancePaused && !compact && (
+            {!allowancePaused && user?.is_guest && (
+                <button type="button" onClick={beginGuestClaim} className="mt-4 inline-flex min-h-10 items-center rounded-xl bg-accent px-4 text-xs font-bold text-white">
+                    Save workspace to continue
+                </button>
+            )}
+            {!allowancePaused && !user?.is_guest && !compact && (
                 <Link href="/dashboard/settings" className="mt-4 inline-flex min-h-10 items-center rounded-xl bg-accent px-4 text-xs font-bold text-white">
                     Review account options
                 </Link>

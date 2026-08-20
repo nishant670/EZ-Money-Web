@@ -1,22 +1,18 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
     AlertTriangle,
-    ArrowDownRight,
     ArrowUpRight,
     CalendarRange,
     CircleHelp,
     Clock3,
-    Lightbulb,
     Loader2,
     RefreshCw,
     Repeat2,
-    Store,
-    WalletCards,
 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
+import DashboardInsightCard from "@/app/components/dashboard/DashboardInsightCard";
 import { apiErrorMessage, DashboardAPI, DashboardResponse } from "@/app/lib/api";
 import { formatDate, formatMoney, toLocalISO } from "@/app/lib/format";
 import { cn } from "@/app/lib/utils";
@@ -53,17 +49,14 @@ export default function InsightsScreen() {
 
     useEffect(() => { void loadInsights(); }, [loadInsights]);
 
-    const accounts = dashboard?.account_spending.map((item) => ({ name: item.account_name, amount: item.amount })) || [];
-    const dueCandidates = dashboard?.recurring_candidates.filter((candidate) => candidate.review_due) || [];
-
     return (
-        <DashboardLayout>
+        <>
             <div className="space-y-7 pb-12">
                 <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">Explainable analysis</p>
                         <h1 className="mt-2 text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Insights, with the numbers behind them.</h1>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Every observation comes from your confirmed transactions. No invented forecasts, scores, or financial advice.</p>
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Explains noteworthy changes and records needing attention—without repeating the dashboard or report breakdowns.</p>
                     </div>
                     <div className="flex flex-col gap-2 rounded-2xl border border-border bg-white p-2 dark:bg-zinc-900 sm:flex-row sm:items-center">
                         <label className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-zinc-500"><CalendarRange className="h-4 w-4 text-accent" /><span className="sr-only">Start date</span><input type="date" value={startDate} max={endDate} onChange={(event) => setStartDate(event.target.value)} className="bg-transparent outline-none" /></label>
@@ -79,27 +72,11 @@ export default function InsightsScreen() {
                     <div className="rounded-[2rem] border border-red-200 bg-red-50 p-8 dark:border-red-900/40 dark:bg-red-950/20"><AlertTriangle className="h-6 w-6 text-red-500" /><h2 className="mt-3 text-lg font-bold">Insights unavailable</h2><p className="mt-2 text-sm text-red-700/70 dark:text-red-300/70">{error}</p><button onClick={() => void loadInsights()} className="mt-5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white">Try again</button></div>
                 ) : dashboard && (
                     <>
-                        <section className="grid gap-4 lg:grid-cols-3">
-                            <article className="rounded-[2rem] bg-zinc-950 p-7 text-white lg:col-span-2">
-                                <div className="flex items-start justify-between gap-5"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">This period</p><h2 className="mt-3 text-4xl font-bold tracking-tight font-rounded">{formatMoney(dashboard.summary.total_spent)}</h2><p className="mt-2 text-sm text-zinc-400">spent across {dashboard.summary.transaction_count} confirmed transactions</p></div><span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10"><ArrowDownRight className="h-5 w-5 text-accent" /></span></div>
-                                <div className="mt-8 grid gap-3 sm:grid-cols-2"><div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs text-zinc-400">Income</p><p className="mt-1 text-xl font-bold">{formatMoney(dashboard.summary.total_income)}</p></div><div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs text-zinc-400">Daily spending average</p><p className="mt-1 text-xl font-bold">{formatMoney(dashboard.summary.daily_average)}</p></div></div>
-                            </article>
-                            <article className="rounded-[2rem] border border-border bg-white p-7 dark:bg-zinc-900"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Review queue</p><h2 className="mt-2 text-3xl font-bold font-rounded">{dueCandidates.length}</h2></div><Clock3 className="h-6 w-6 text-accent" /></div><p className="mt-3 text-sm leading-6 text-zinc-500">Likely recurring expenses whose expected date is in or just after this period.</p><div className="mt-5 rounded-xl bg-accent/10 p-3 text-xs font-semibold text-accent">Detected from stable repeated merchant or category patterns.</div></article>
-                        </section>
+                        <section className="rounded-[2rem] border border-border bg-white p-7 dark:bg-zinc-900"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Correction queue</p><h2 className="mt-2 text-3xl font-bold font-rounded">{dashboard.review_items.length}</h2></div><Clock3 className="h-6 w-6 text-accent" /></div><p className="mt-3 text-sm leading-6 text-zinc-500">Transactions missing a usable category or linked account in this period.</p>{dashboard.review_items.length > 0 ? <Link href="/dashboard#review-queue" className="mt-5 inline-flex min-h-10 items-center rounded-xl bg-amber-50 px-4 text-xs font-bold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">Review and correct</Link> : <div className="mt-5 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">Nothing needs correction.</div>}</section>
 
                         <section>
                             <div className="mb-4 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">What changed</p><h2 className="mt-1 text-xl font-bold font-rounded">Insight cards</h2></div><span className="text-xs text-zinc-400">Compared with the preceding equal-length period</span></div>
-                            {dashboard.insights.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{dashboard.insights.map((insight) => (
-                                <article key={`${insight.kind}-${insight.title}`} className={cn("rounded-[1.75rem] border bg-white p-6 dark:bg-zinc-900", insight.severity === "warning" ? "border-amber-200 dark:border-amber-900/50" : "border-border")}>
-                                    <span className={cn("grid h-10 w-10 place-items-center rounded-xl", insight.severity === "warning" ? "bg-amber-50 text-amber-600 dark:bg-amber-950/30" : "bg-accent/10 text-accent")}>{insight.severity === "warning" ? <AlertTriangle className="h-4 w-4" /> : <Lightbulb className="h-4 w-4" />}</span>
-                                    <h3 className="mt-5 text-base font-bold">{insight.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-500">{insight.body}</p>
-                                </article>
-                            ))}</div> : <div className="rounded-[1.75rem] border border-dashed border-border p-8 text-center text-sm text-zinc-400">Add more transactions to unlock comparisons and patterns.</div>}
-                        </section>
-
-                        <section className="grid gap-6 xl:grid-cols-2">
-                            <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/10 text-accent"><WalletCards className="h-4 w-4" /></span><div><h2 className="font-bold font-rounded">Account usage</h2><p className="text-xs text-zinc-400">Spending by payment source</p></div></div><div className="mt-6 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={accounts}><CartesianGrid vertical={false} stroke="#eee" strokeDasharray="3 3" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#71717a" }} /><YAxis hide /><Tooltip formatter={(value) => formatMoney(Number(value))} contentStyle={{ borderRadius: 16, border: "1px solid #f0e5e7" }} /><Bar dataKey="amount" fill="#FF8865" radius={[8, 8, 0, 0]} barSize={36} /></BarChart></ResponsiveContainer></div></div>
-                            <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30"><Store className="h-4 w-4" /></span><div><h2 className="font-bold font-rounded">Merchant concentration</h2><p className="text-xs text-zinc-400">Your largest merchant totals</p></div></div><div className="mt-6 space-y-3">{dashboard.top_merchants.map((merchant, index) => <div key={merchant.merchant} className="flex items-center gap-4 rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-800"><span className="text-xs font-bold text-zinc-400">0{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{merchant.merchant}</p><p className="text-xs text-zinc-400">{merchant.transaction_count} entries</p></div><p className="text-sm font-bold">{formatMoney(merchant.amount)}</p></div>)}</div></div>
+                            {dashboard.insights.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{dashboard.insights.map((insight) => <DashboardInsightCard key={`${insight.kind}-${insight.title}`} insight={insight} period={{ start_date: startDate, end_date: endDate }} />)}</div> : <div className="rounded-[1.75rem] border border-dashed border-border p-8 text-center text-sm text-zinc-400">Add more transactions to unlock comparisons and patterns.</div>}
                         </section>
 
                         <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
@@ -111,6 +88,6 @@ export default function InsightsScreen() {
                     </>
                 )}
             </div>
-        </DashboardLayout>
+        </>
     );
 }

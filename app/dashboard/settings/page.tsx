@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Check, Globe, Loader2, LogOut, Save, User } from "lucide-react";
-import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
+import { Check, Globe, Loader2, LogOut, Save, ShieldAlert, User } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { apiErrorMessage, UserAPI } from "@/app/lib/api";
 
@@ -12,7 +11,7 @@ function nameParts(username = "") {
 }
 
 export default function SettingsScreen() {
-    const { user, updateUser, logout } = useAuth();
+    const { user, updateUser, logout, beginGuestClaim } = useAuth();
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [loading, setLoading] = useState(false);
@@ -64,7 +63,7 @@ export default function SettingsScreen() {
     };
 
     return (
-        <DashboardLayout>
+        <>
             <div className="mx-auto max-w-3xl space-y-8 pb-20">
                 <div>
                     <h1 className="text-3xl font-bold font-rounded tracking-tight dark:text-white">Settings</h1>
@@ -75,6 +74,8 @@ export default function SettingsScreen() {
                     <User className="h-5 w-5" />
                     <span className="text-sm font-bold">My Profile</span>
                 </div>
+
+                {user?.is_guest && <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100 sm:p-8"><div className="flex items-start gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"><ShieldAlert className="h-5 w-5" /></span><div><h2 className="font-bold">Save this guest workspace</h2><p className="mt-1 text-sm leading-6 opacity-75">Clearing this browser’s data, using a private window, or moving to another device can permanently lose its transactions, accounts, and splits.</p><button type="button" onClick={beginGuestClaim} className="mt-4 min-h-11 rounded-xl bg-amber-900 px-5 text-sm font-bold text-white dark:bg-amber-200 dark:text-amber-950">Save this workspace</button></div></div></section>}
 
                 <section className="rounded-[2.5rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900 sm:p-10">
                     <div className="mb-10 flex flex-col items-center gap-6 sm:flex-row">
@@ -137,6 +138,6 @@ export default function SettingsScreen() {
                     <button type="button" onClick={logout} className="w-full rounded-xl border border-border px-6 py-3 text-sm font-bold transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 sm:w-auto">Logout</button>
                 </section>
             </div>
-        </DashboardLayout>
+        </>
     );
 }

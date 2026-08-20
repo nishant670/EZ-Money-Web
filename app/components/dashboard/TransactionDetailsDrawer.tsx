@@ -5,11 +5,10 @@ import Link from "next/link";
 import {
     X,
     Trash2,
-    Check,
     Tag,
     Wallet,
     Clock,
-    ShieldCheck,
+    TriangleAlert,
     Copy,
     Loader2,
     Users,
@@ -23,11 +22,13 @@ import { formatDate, formatMoney, formatTime, toLocalISO } from "@/app/lib/forma
 interface TransactionDetailsDrawerProps {
     isOpen: boolean;
     onClose: () => void;
+    onChanged?: () => void;
     transaction: Transaction | null;
+    reviewStatus?: "needs_review";
     onEdit?: (transaction: Transaction, splitBill: SplitBill | null, splitDataAvailable: boolean) => void;
 }
 
-export default function TransactionDetailsDrawer({ isOpen, onClose, transaction, onEdit }: TransactionDetailsDrawerProps) {
+export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, transaction, reviewStatus, onEdit }: TransactionDetailsDrawerProps) {
     const [loading, setLoading] = useState(false);
     const [splitResult, setSplitResult] = useState<{ entryID: number; bill: SplitBill | null; available: boolean } | null>(null);
 
@@ -55,7 +56,8 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction,
         setLoading(true);
         try {
             await EntriesAPI.delete(transaction.id);
-            onClose(); // Parent should refresh on close
+            onChanged?.();
+            onClose();
         } catch (err) {
             console.error("Failed to delete", err);
             alert(apiErrorMessage(err, "Failed to delete transaction."));
@@ -83,6 +85,7 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction,
                 notes: transaction.notes,
                 account_id: transaction.account_id,
             });
+            onChanged?.();
             onClose();
         } catch (err) {
             alert(apiErrorMessage(err, "Failed to duplicate transaction."));
@@ -144,10 +147,10 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction,
                                         <span className="flex items-center gap-2"><Wallet className="w-3.5 h-3.5" /> Account</span>
                                         <span className="text-zinc-900 dark:text-white">{transaction.account?.name || transaction.mode || "Cash"}</span>
                                     </div>
-                                    <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-zinc-400">
-                                        <span className="flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> Status</span>
-                                        <span className="text-green-500 flex items-center gap-1"><Check className="w-3 h-3" /> Confirmed</span>
-                                    </div>
+                                    {reviewStatus === "needs_review" && <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-amber-300">
+                                        <span className="flex items-center gap-2"><TriangleAlert className="w-3.5 h-3.5" /> Review</span>
+                                        <span>Correction required</span>
+                                    </div>}
                                 </div>
 
                                 <div className="space-y-4">

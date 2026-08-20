@@ -35,6 +35,28 @@ export interface Account {
     is_default: boolean;
     created_at: string;
     updated_at: string;
+    summary?: AccountSummary;
+}
+
+export interface AccountSummary {
+    spent_this_month: number;
+    received_this_month: number;
+    entries_this_month: number;
+    lifetime_spent: number;
+    lifetime_received: number;
+    entries_total: number;
+    last_activity_date?: string;
+    outstanding?: number;
+    credit_utilisation?: number;
+    running_balance?: number;
+    limit?: {
+        outstanding: number;
+        outstanding_source: "statement" | "ledger";
+        emi_blocked_principal: number;
+        credit_limit: number;
+        available_limit?: number;
+        utilisation_pct?: number;
+    };
 }
 
 export type AccountInput = Omit<Account, "id" | "user_id" | "created_at" | "updated_at">;
@@ -231,6 +253,7 @@ export interface EntrySplitInput {
 }
 
 export interface ParsedTransaction {
+    stage?: "draft";
     title?: string;
     type?: "income" | "expense";
     amount?: number;
@@ -244,6 +267,7 @@ export interface ParsedTransaction {
     date?: string;
     time?: string;
     account_hint?: string;
+    source_text?: string;
     confidence?: Record<string, number>;
     needs_confirmation?: Record<string, boolean>;
     missing_fields?: string[];
@@ -635,7 +659,7 @@ export const ReportsAPI = {
 };
 
 export const AccountsAPI = {
-    list: () => api.get<Account[]>("/v1/accounts"),
+    list: (tz?: string) => api.get<Account[]>("/v1/accounts", { params: tz ? { tz } : undefined }),
     create: (data: AccountInput) => api.post<Account>("/v1/accounts", data),
     update: (id: number, data: AccountInput) => api.put<Account>(`/v1/accounts/${id}`, data),
     delete: (id: number) => api.delete(`/v1/accounts/${id}`),

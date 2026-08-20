@@ -24,6 +24,36 @@ import { toApiTime, toLocalISO } from "@/app/lib/format";
 import InlineSplitEditor from "@/app/components/dashboard/InlineSplitEditor";
 import Paywall from "@/app/components/Paywall";
 
+type DraftField = "type" | "amount" | "title" | "category" | "date" | "account" | "tags" | "notes";
+
+const DRAFT_FIELD_LABELS: Record<DraftField, string> = {
+    type: "type",
+    amount: "amount",
+    title: "merchant or title",
+    category: "category",
+    date: "date and time",
+    account: "account",
+    tags: "tags",
+    notes: "notes",
+};
+
+function draftFieldFor(rawField: string): DraftField | null {
+    const field = rawField.trim().toLowerCase();
+    if (field === "type") return "type";
+    if (field === "amount" || field === "currency") return "amount";
+    if (field === "title" || field === "merchant") return "title";
+    if (field === "category") return "category";
+    if (field === "date" || field === "time") return "date";
+    if (["account", "accountid", "account_id", "account_hint", "mode", "payment_mode"].includes(field)) return "account";
+    if (field === "tag" || field === "tags") return "tags";
+    if (field === "note" || field === "notes") return "notes";
+    return null;
+}
+
+function uniqueDraftFields(rawFields: string[]) {
+    return Array.from(new Set(rawFields.map(draftFieldFor).filter((field): field is DraftField => Boolean(field))));
+}
+
 interface AddTransactionModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -53,6 +83,12 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
     const [saving, setSaving] = useState(false);
     const [text, setText] = useState("");
     const [success, setSuccess] = useState(false);
+    const [parsedDraft, setParsedDraft] = useState(false);
+    const [parseFailed, setParseFailed] = useState(false);
+    const [aiFilledFields, setAiFilledFields] = useState<DraftField[]>([]);
+    const [pendingReviewFields, setPendingReviewFields] = useState<DraftField[]>([]);
+    const [missingFields, setMissingFields] = useState<DraftField[]>([]);
+    const [clarifications, setClarifications] = useState<string[]>([]);
 
     // Form State
     const [type, setType] = useState<"expense" | "income">("expense");
@@ -71,6 +107,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
     const [splitGroups, setSplitGroups] = useState<SplitGroup[]>([]);
     const [entrySplit, setEntrySplit] = useState<EntrySplitInput | null>(null);
     const [tags, setTags] = useState<string[]>([]);
+    const [notes, setNotes] = useState("");
     const [newTag, setNewTag] = useState("");
     const [showTagInput, setShowTagInput] = useState(false);
     const [error, setError] = useState("");
@@ -109,6 +146,12 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
         setSuccess(false);
         setError("");
         setAccessError(null);
+        setParsedDraft(false);
+        setParseFailed(false);
+        setAiFilledFields([]);
+        setPendingReviewFields([]);
+        setMissingFields([]);
+        setClarifications([]);
         setShowTagInput(false);
         setNewTag("");
 
@@ -123,6 +166,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
             setAccountID(transaction.account_id);
             setExplicitPaymentMode(transaction.mode);
             setTags(transaction.tags || []);
+            setNotes(transaction.notes || "");
             setEntrySplit(splitDataAvailable ? entrySplitFromBill(linkedSplitBill) : null);
             return;
         }
@@ -137,6 +181,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
         setAccountID("");
         setExplicitPaymentMode("");
         setTags([]);
+        setNotes("");
         setEntrySplit(null);
     }, [isOpen, linkedSplitBill, splitDataAvailable, transaction]);
 
@@ -157,12 +202,58 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
         setAccountID("");
         setExplicitPaymentMode("");
         setTags([]);
+        setNotes("");
         setEntrySplit(null);
         setMode("quick");
         setSuccess(false);
         setError("");
         setAccessError(null);
         setAccessFeatureLabel("This feature");
+        setParsedDraft(false);
+        setParseFailed(false);
+        setAiFilledFields([]);
+        setPendingReviewFields([]);
+        setMissingFields([]);
+        setClarifications([]);
+    };
+
+    const updateSourceText = (value: string) => {
+        setText(value);
+        setParsedDraft(false);
+        setParseFailed(false);
+        setAiFilledFields([]);
+        setPendingReviewFields([]);
+        setMissingFields([]);
+        setClarifications([]);
+    };
+
+    const markFieldReviewed = (field: DraftField) => {
+        setPendingReviewFields((current) => current.filter((item) => item !== field));
+        setMissingFields((current) => current.filter((item) => item !== field));
+    };
+
+    const markFieldChanged = (field: DraftField) => {
+        markFieldReviewed(field);
+        setAiFilledFields((current) => current.filter((item) => item !== field));
+    };
+
+    const fieldReviewState = (field: DraftField) => {
+        if (pendingReviewFields.includes(field)) return "review";
+        if (parsedDraft && aiFilledFields.includes(field)) return "filled";
+        return "manual";
+    };
+
+    const fieldClass = (field: DraftField, base: string) => cn(
+        base,
+        fieldReviewState(field) === "review" && "ring-2 ring-amber-400/70 bg-amber-50 dark:bg-amber-950/20",
+        fieldReviewState(field) === "filled" && "ring-1 ring-accent/40 bg-accent/5"
+    );
+
+    const FieldStatus = ({ field }: { field: DraftField }) => {
+        const status = fieldReviewState(field);
+        if (status === "manual") return null;
+        if (status === "review") return <button type="button" onClick={(event) => { event.preventDefault(); markFieldReviewed(field); }} title={`Confirm the AI's ${DRAFT_FIELD_LABELS[field]} value`} className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] tracking-normal text-amber-700 hover:bg-amber-200 dark:bg-amber-950/50 dark:text-amber-300">Check this · confirm</button>;
+        return <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[9px] tracking-normal text-accent">AI filled</span>;
     };
 
     const handleExtract = async () => {
@@ -171,6 +262,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
         setError("");
         setAccessError(null);
         setAccessFeatureLabel("AI transaction extraction");
+        setParseFailed(false);
         try {
             const formData = new FormData();
             formData.append("hint_text", text);
@@ -181,8 +273,25 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
 
             // Map response to form
             if (data) {
+                const filled: string[] = [];
+                if (data.type) filled.push("type");
+                if (data.amount !== undefined) filled.push("amount");
+                if (data.title || data.merchant) filled.push("title");
+                if (data.category) filled.push("category");
+                if (data.date || data.time) filled.push("date");
+                if (data.account_hint || data.mode) filled.push("account");
+                if (data.tags?.length) filled.push("tags");
+                if (data.note) filled.push("notes");
+                const explicitlyFlagged = Object.entries(data.needs_confirmation || {}).filter(([, needsReview]) => needsReview).map(([field]) => field);
+                const lowConfidence = Object.entries(data.confidence || {}).filter(([, confidence]) => confidence < 0.7).map(([field]) => field);
+                const missing = uniqueDraftFields(data.missing_fields || []);
+                setAiFilledFields(uniqueDraftFields(filled));
+                setMissingFields(missing);
+                setPendingReviewFields(uniqueDraftFields([...explicitlyFlagged, ...lowConfidence, ...(data.missing_fields || [])]));
+                setClarifications(data.clarifications || []);
+                setParsedDraft(true);
                 if (data.type) setType(data.type as "expense" | "income");
-                if (data.amount) setAmount(data.amount.toString());
+                if (data.amount !== undefined) setAmount(data.amount.toString());
                 if (data.title || data.merchant) setTitle(data.merchant || data.title || "");
                 if (data.category) setCategory(data.category);
                 if (data.date) setDate(data.date + (data.time ? "T" + data.time : "T12:00")); // Rough iso conversion
@@ -194,12 +303,16 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                     if (match) setAccountID(match.id);
                 }
                 if (data.tags) setTags(data.tags);
+                if (data.note) setNotes(data.note);
+                setText(data.source_text || text);
             }
             setMode("manual");
         } catch (requestError) {
             const entitlement = asEntitlementError(requestError);
             if (entitlement) setAccessError(entitlement);
             else setError(apiErrorMessage(requestError, "AI extraction is unavailable. You can still enter the transaction manually."));
+            setParseFailed(true);
+            setParsedDraft(false);
             setMode("manual");
         } finally {
             setExtracting(false);
@@ -207,6 +320,10 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
     };
 
     const handleSave = async () => {
+        if (pendingReviewFields.length > 0) {
+            setError(`Review ${pendingReviewFields.map((field) => DRAFT_FIELD_LABELS[field]).join(", ")} before saving.`);
+            return;
+        }
         if (!amount || !title || !accountID) {
             setError("Amount, merchant, and account are required.");
             return;
@@ -235,7 +352,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                 type,
                 amount: numericAmount,
                 currency: "INR",
-                source: transaction?.source || (text.trim() ? "text" : "manual"),
+                source: transaction?.source || (parsedDraft ? "text" : "manual"),
                 // The form edits whichever name the drawer displays. Preserve a
                 // distinct stored title when the transaction already has a
                 // merchant; otherwise this field is the title itself.
@@ -249,8 +366,8 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                 mode: requiresExplicitPaymentMode ? explicitPaymentMode || undefined : undefined,
                 account_id: accountID,
                 tags,
-                notes: transaction?.notes,
-                source_text: transaction?.source_text,
+                notes: notes.trim(),
+                source_text: transaction?.source_text || (parsedDraft ? text.trim() : undefined),
                 ...(!isEditing || splitDataAvailable ? { split: type === "expense" ? entrySplit : null } : {}),
             };
             const response = transaction
@@ -275,6 +392,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
     const handleAddTag = () => {
         if (newTag.trim() && !tags.includes(newTag.trim())) {
             setTags([...tags, newTag.trim()]);
+            markFieldChanged("tags");
             setNewTag("");
             setShowTagInput(false);
         }
@@ -333,13 +451,13 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                             </div>
                         </div>}
 
-                        <div className="p-8 min-h-[400px]">
+                        <div className="min-h-[400px] p-8 pb-36">
                             {mode === "quick" ? (
                                 <div className="space-y-8 animate-in fade-in duration-500">
                                     <div className="relative">
                                         <textarea
                                             value={text}
-                                            onChange={(e) => setText(e.target.value)}
+                                            onChange={(e) => updateSourceText(e.target.value)}
                                             placeholder="Paste transaction text here... e.g. 'Paid 250 lunch UPI'"
                                             className="w-full h-48 bg-zinc-50 dark:bg-zinc-800 border-none rounded-[2rem] p-8 text-xl font-medium outline-none focus:ring-4 focus:ring-accent/10 transition-all resize-none placeholder:text-zinc-300"
                                         />
@@ -377,18 +495,33 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                                 </div>
                             ) : (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                                    {!isEditing && text.trim() && (
+                                        <section className={cn("rounded-2xl border p-4", parsedDraft ? "border-amber-200 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/20" : "border-border bg-zinc-50 dark:bg-zinc-800")}>
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">{parsedDraft ? "AI draft — review before saving" : "Your original text is still here"}</p>
+                                                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700 dark:text-zinc-200">{text}</p>
+                                                </div>
+                                                <button onClick={() => setMode("quick")} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-accent hover:bg-accent/10">Edit text</button>
+                                            </div>
+                                            {parsedDraft && pendingReviewFields.length > 0 && <p className="mt-3 text-xs font-bold text-amber-700 dark:text-amber-300">Check {pendingReviewFields.map((field) => DRAFT_FIELD_LABELS[field]).join(", ")} before save is enabled.</p>}
+                                            {parseFailed && <p className="mt-3 text-xs text-zinc-500">The form remains manual; edit or copy the text above, or return to Quick Add and try again.</p>}
+                                            {clarifications.map((clarification) => <p key={clarification} className="mt-2 flex items-start gap-2 text-sm text-amber-800 dark:text-amber-200"><Info className="mt-0.5 h-4 w-4 shrink-0" />{clarification}</p>)}
+                                        </section>
+                                    )}
+                                    {parsedDraft && missingFields.length > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200"><p className="font-bold">Still needed</p><p className="mt-1">Fill or confirm: {missingFields.map((field) => DRAFT_FIELD_LABELS[field]).join(", ")}.</p></div>}
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Type</label>
-                                            <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Type<FieldStatus field="type" /></label>
+                                            <div className={fieldClass("type", "flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl")}>
                                                 <button
-                                                    onClick={() => setType("expense")}
+                                                    onClick={() => { setType("expense"); markFieldChanged("type"); }}
                                                     className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", type === "expense" ? "bg-white dark:bg-zinc-700 text-accent shadow-sm" : "text-zinc-400")}
                                                 >
                                                     Expense
                                                 </button>
                                                 <button
-                                                    onClick={() => { setType("income"); setEntrySplit(null); }}
+                                                    onClick={() => { setType("income"); setEntrySplit(null); markFieldChanged("type"); }}
                                                     className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", type === "income" ? "bg-white dark:bg-zinc-700 text-green-500 shadow-sm" : "text-zinc-400")}
                                                 >
                                                     Income
@@ -396,15 +529,15 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Amount</label>
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Amount<FieldStatus field="amount" /></label>
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-zinc-400">₹</span>
                                                 <input
                                                     type="number"
                                                     placeholder="0.00"
                                                     value={amount}
-                                                    onChange={(e) => setAmount(e.target.value)}
-                                                    className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-8 pr-4 py-3 text-lg font-bold outline-none focus:ring-2 focus:ring-accent/20"
+                                                    onChange={(e) => { setAmount(e.target.value); markFieldChanged("amount"); }}
+                                                    className={fieldClass("amount", "w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-8 pr-4 py-3 text-lg font-bold outline-none focus:ring-2 focus:ring-accent/20")}
                                                 />
                                             </div>
                                         </div>
@@ -412,25 +545,25 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
 
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Merchant / Title</label>
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Merchant / Title<FieldStatus field="title" /></label>
                                             <div className="relative">
                                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                                                 <input
                                                     type="text"
                                                     placeholder="e.g. Starbucks"
                                                     value={title}
-                                                    onChange={(e) => setTitle(e.target.value)}
-                                                    className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20"
+                                                    onChange={(e) => { setTitle(e.target.value); markFieldChanged("title"); }}
+                                                    className={fieldClass("title", "w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20")}
                                                 />
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Category</label>
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Category<FieldStatus field="category" /></label>
                                             <select
                                                 value={category}
-                                                onChange={(e) => setCategory(e.target.value)}
+                                                onChange={(e) => { setCategory(e.target.value); markFieldChanged("category"); }}
                                                 disabled={categoryOptions.length === 0}
-                                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
+                                                className={fieldClass("category", "w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-60")}
                                             >
                                                 {categoryOptions.length === 0 && <option value="">{categoriesError ? "Categories unavailable" : "Loading categories…"}</option>}
                                                 {categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -441,25 +574,25 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
 
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Date & Time</label>
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Date & Time<FieldStatus field="date" /></label>
                                             <div className="relative">
                                                 <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                                                 <input
                                                     type="datetime-local"
                                                     value={date}
-                                                    onChange={(e) => setDate(e.target.value)}
-                                                    className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20"
+                                                    onChange={(e) => { setDate(e.target.value); markFieldChanged("date"); }}
+                                                    className={fieldClass("date", "w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20")}
                                                 />
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Account</label>
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Account<FieldStatus field="account" /></label>
                                             <div className="relative">
                                                 <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                                                 <select
                                                     value={accountID}
-                                                    onChange={(e) => setAccountID(Number(e.target.value))}
-                                                    className="w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20"
+                                                    onChange={(e) => { setAccountID(Number(e.target.value)); markFieldChanged("account"); }}
+                                                    className={fieldClass("account", "w-full bg-zinc-50 dark:bg-zinc-800 border-none rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20")}
                                                 >
                                                     <option value="" disabled>Select an account</option>
                                                     {accounts.map((item) => <option key={item.id} value={item.id}>{item.name}{item.is_default ? " (Default)" : ""}</option>)}
@@ -473,8 +606,8 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                                             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Payment mode</label>
                                             <select
                                                 value={explicitPaymentMode}
-                                                onChange={(event) => setExplicitPaymentMode(event.target.value as PaymentMode)}
-                                                className="w-full rounded-xl border-none bg-zinc-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20 dark:bg-zinc-800"
+                                                onChange={(event) => { setExplicitPaymentMode(event.target.value as PaymentMode); markFieldChanged("account"); }}
+                                                className={fieldClass("account", "w-full rounded-xl border-none bg-zinc-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20 dark:bg-zinc-800")}
                                             >
                                                 <option value="" disabled>Choose how this account paid</option>
                                                 {PAYMENT_MODES.map((paymentMode) => <option key={paymentMode} value={paymentMode}>{paymentMode}</option>)}
@@ -487,10 +620,10 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                                     {isEditing && !splitDataAvailable && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">The linked split could not be loaded, so this save will leave it unchanged. Open the split ledger to edit it separately.</p>}
 
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Tags</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Tags<FieldStatus field="tags" /></label>
                                         <div className="flex flex-wrap gap-2">
                                             {tags.map((tag, i) => (
-                                                <span key={i} onClick={() => setTags(tags.filter(t => t !== tag))} className="flex items-center gap-1.5 px-3 py-1 bg-accent/10 text-accent text-xs font-bold rounded-lg group cursor-pointer hover:bg-red-500/10 hover:text-red-500 transition-colors">
+                                                <span key={i} onClick={() => { setTags(tags.filter(t => t !== tag)); markFieldChanged("tags"); }} className="flex items-center gap-1.5 px-3 py-1 bg-accent/10 text-accent text-xs font-bold rounded-lg group cursor-pointer hover:bg-red-500/10 hover:text-red-500 transition-colors">
                                                     <Tag className="w-3 h-3" /> {tag} <X className="w-2.5 h-2.5 ml-1" />
                                                 </span>
                                             ))}
@@ -514,6 +647,11 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                                             )}
                                         </div>
                                     </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Notes <span className="font-medium normal-case tracking-normal">optional</span><FieldStatus field="notes" /></label>
+                                        <textarea value={notes} onChange={(event) => { setNotes(event.target.value); markFieldChanged("notes"); }} rows={3} placeholder="Add context you’ll want later" className={fieldClass("notes", "w-full resize-none rounded-xl border-none bg-zinc-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/20 dark:bg-zinc-800")} />
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -527,7 +665,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                             <div className="flex gap-4">
                                 <button
                                     onClick={handleSave}
-                                    disabled={saving || mode === "quick" || !accountID}
+                                    disabled={saving || mode === "quick" || !accountID || pendingReviewFields.length > 0}
                                     className={cn(
                                         "group flex items-center justify-center gap-2 px-10 py-3 bg-accent text-white rounded-xl font-bold text-sm shadow-xl shadow-accent/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-70",
                                         success && "bg-green-500 shadow-green-500/20"

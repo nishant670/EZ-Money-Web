@@ -24,7 +24,6 @@ import {
     TrendingUp,
     X,
 } from "lucide-react";
-import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
 import {
     Account,
     AccountsAPI,
@@ -33,6 +32,8 @@ import {
     Budget,
     BudgetInput,
     BudgetsAPI,
+    DashboardAPI,
+    DashboardBudgetStatus,
     EMICalculation,
     Subscription,
     SubscriptionInput,
@@ -40,6 +41,7 @@ import {
     ToolsAPI,
 } from "@/app/lib/api";
 import Paywall from "@/app/components/Paywall";
+import BudgetProgressCard from "@/app/components/dashboard/BudgetProgressCard";
 import { categoryOptionsFor, loadCategories } from "@/app/lib/categories";
 import { formatDate, formatMoney, toLocalISO } from "@/app/lib/format";
 import { cn } from "@/app/lib/utils";
@@ -157,8 +159,9 @@ function FeatureError({ error, featureLabel, fallback }: { error: unknown; featu
 export default function ToolsScreen() {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [budgets, setBudgets] = useState<Budget[]>([]);
+    const [budgetStatuses, setBudgetStatuses] = useState<DashboardBudgetStatus[]>([]);
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-    const [budgetError, setBudgetError] = useState<unknown>(null); const [subscriptionError, setSubscriptionError] = useState<unknown>(null);
+    const [budgetError, setBudgetError] = useState<unknown>(null); const [budgetProgressError, setBudgetProgressError] = useState<unknown>(null); const [subscriptionError, setSubscriptionError] = useState<unknown>(null);
     const [loading, setLoading] = useState(true); const [workingId, setWorkingId] = useState<string | null>(null);
     const [showBudgetForm, setShowBudgetForm] = useState(false); const [showSubscriptionForm, setShowSubscriptionForm] = useState(false);
     const [activeSIPPresetID, setActiveSIPPresetID] = useState<SIPPresetID>("mutual_fund");
@@ -171,11 +174,17 @@ export default function ToolsScreen() {
     const [showSchedule, setShowSchedule] = useState(false);
 
     const loadPlanning = useCallback(async () => {
-        setLoading(true); setBudgetError(null); setSubscriptionError(null);
-        const [accountsResult, budgetsResult, subscriptionsResult] = await Promise.allSettled([AccountsAPI.list(), BudgetsAPI.list(), SubscriptionsAPI.list()]);
+        setLoading(true); setBudgetError(null); setBudgetProgressError(null); setSubscriptionError(null);
+        const [accountsResult, budgetsResult, subscriptionsResult, dashboardResult] = await Promise.allSettled([
+            AccountsAPI.list(),
+            BudgetsAPI.list(),
+            SubscriptionsAPI.list(),
+            DashboardAPI.get({ tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+        ]);
         if (accountsResult.status === "fulfilled") setAccounts(accountsResult.value.data);
         if (budgetsResult.status === "fulfilled") setBudgets(budgetsResult.value.data); else setBudgetError(budgetsResult.reason);
         if (subscriptionsResult.status === "fulfilled") setSubscriptions(subscriptionsResult.value.data); else setSubscriptionError(subscriptionsResult.reason);
+        if (dashboardResult.status === "fulfilled") setBudgetStatuses(dashboardResult.value.data.budget_statuses); else { setBudgetStatuses([]); setBudgetProgressError(dashboardResult.reason); }
         setLoading(false);
     }, []);
     useEffect(() => { void loadPlanning(); }, [loadPlanning]);
@@ -208,8 +217,9 @@ export default function ToolsScreen() {
     const toggleSubscription = async (subscription: Subscription) => { setWorkingId(`subscription-${subscription.id}`); const nextStatus = subscription.status === "active" ? "paused" : "active"; try { await SubscriptionsAPI.update(subscription.id, { account_id: subscription.account_id, name: subscription.name, merchant: subscription.merchant, category: subscription.category, amount: subscription.amount, currency: "INR", billing_interval: subscription.billing_interval, next_due_date: subscription.next_due_date, last_charged_date: subscription.last_charged_date, status: nextStatus, reminder_days: subscription.reminder_days, cancel_before_due: subscription.cancel_before_due, notes: subscription.notes }); await loadPlanning(); } catch (requestError) { setSubscriptionError(requestError); } finally { setWorkingId(null); } };
     const markPaid = async (subscription: Subscription) => { setWorkingId(`subscription-${subscription.id}`); try { await SubscriptionsAPI.markPaid(subscription.id); await loadPlanning(); } catch (requestError) { setSubscriptionError(requestError); } finally { setWorkingId(null); } };
     const deleteSubscription = async (subscription: Subscription) => { if (!window.confirm(`Stop tracking ${subscription.name}?`)) return; setWorkingId(`subscription-${subscription.id}`); try { await SubscriptionsAPI.delete(subscription.id); await loadPlanning(); } catch (requestError) { setSubscriptionError(requestError); } finally { setWorkingId(null); } };
+    const budgetStatusByID = new Map(budgetStatuses.map((status) => [status.budget_id, status]));
 
-    return <DashboardLayout><div className="space-y-8 pb-16"><header><p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">Plan with context</p><h1 className="mt-2 text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Planning & tools</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Calculate loan and SIP scenarios, set monthly guardrails, and review recurring payments. Calculators are informational and are not financial advice.</p></header>
+    return <><div className="space-y-8 pb-16"><header><p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">Plan with context</p><h1 className="mt-2 text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Planning & tools</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Calculate loan and SIP scenarios, set monthly guardrails, and review recurring payments. Calculators are informational and are not financial advice.</p></header>
         <section aria-label="Available calculators" className="grid gap-3 md:grid-cols-5">
             {[
                 { href: "#sip", label: "SIP", caption: "Investments", icon: ChartLine, active: true },
@@ -226,10 +236,37 @@ export default function ToolsScreen() {
             <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 sm:p-6">{emiResult ? <><p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Estimated monthly EMI</p><p className="mt-3 text-4xl font-bold font-rounded sm:text-5xl">{formatMoney(emiResult.monthly_emi)}</p><div className="mt-7 grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-white/5 p-4"><p className="text-xs text-zinc-400">Total payment</p><p className="mt-1 text-lg font-bold">{formatMoney(emiResult.total_payment)}</p></div><div className="rounded-2xl bg-white/5 p-4"><p className="text-xs text-zinc-400">Total interest</p><p className="mt-1 text-lg font-bold text-accent">{formatMoney(emiResult.total_interest)}</p></div></div><button onClick={() => setShowSchedule((show) => !show)} className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-zinc-300">{showSchedule ? "Hide" : "View"} amortization schedule <ChevronDown className={cn("h-4 w-4 transition", showSchedule && "rotate-180")} /></button>{showSchedule && <div className="mt-4 max-h-64 overflow-auto rounded-xl border border-white/10"><table className="w-full min-w-[520px] text-left text-xs"><thead className="sticky top-0 bg-zinc-900 text-zinc-400"><tr><th className="p-3">Month</th><th className="p-3">Principal</th><th className="p-3">Interest</th><th className="p-3">Balance</th></tr></thead><tbody>{emiResult.schedule.map((row) => <tr key={row.month} className="border-t border-white/10"><td className="p-3">{row.month}</td><td className="p-3">{formatMoney(row.principal_amount)}</td><td className="p-3">{formatMoney(row.interest_amount)}</td><td className="p-3">{formatMoney(row.closing_balance)}</td></tr>)}</tbody></table></div>}</> : <div className="grid h-full min-h-72 place-items-center text-center"><div><IndianRupee className="mx-auto h-8 w-8 text-zinc-600" /><h3 className="mt-4 font-bold">Your repayment view will appear here</h3><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-500">FINNRI uses the backend calculator to return EMI, total interest, and a month-by-month schedule.</p></div></div>}</div>
         </section>
 
-        <section id="budgets" className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2 text-accent"><BellRing className="h-4 w-4" /><p className="text-xs font-bold uppercase tracking-[0.18em]">Monthly guardrails</p></div><h2 className="mt-2 text-2xl font-bold font-rounded">Budgets</h2><p className="mt-1 text-sm text-zinc-500">Get an in-app alert when confirmed expenses reach your threshold.</p></div><button disabled={Boolean(budgetError)} onClick={() => setShowBudgetForm(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 text-sm font-bold text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"><Plus className="h-4 w-4" /> New budget</button></div>{loading ? <div className="grid min-h-48 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div> : budgetError ? <div className="mt-6"><FeatureError error={budgetError} featureLabel="Budget alerts" fallback="We couldn’t load your budgets." /></div> : budgets.length === 0 ? <p className="mt-6 rounded-2xl bg-zinc-50 p-8 text-center text-sm text-zinc-400 dark:bg-zinc-800">No budgets yet. Add a monthly total or category guardrail.</p> : <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{budgets.map((budget) => <article key={budget.id} className={cn("rounded-2xl border border-border p-5", !budget.active && "opacity-60")}><div className="flex items-start justify-between"><div><p className="font-bold">{budget.name}</p><p className="mt-1 text-xs text-zinc-400">{budget.category || "All expenses"}</p></div><span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider", budget.active ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800")}>{budget.active ? "Active" : "Paused"}</span></div><p className="mt-5 text-2xl font-bold font-rounded">{formatMoney(budget.limit_amount)}</p><p className="mt-1 text-xs text-zinc-400">Alert at {budget.alert_threshold_percent}% · monthly</p><div className="mt-5 flex gap-2 border-t border-border pt-4"><button disabled={workingId === `budget-${budget.id}`} onClick={() => void toggleBudget(budget)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-zinc-100 py-2.5 text-xs font-bold dark:bg-zinc-800">{budget.active ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}{budget.active ? "Pause" : "Resume"}</button><button onClick={() => void deleteBudget(budget)} className="rounded-xl p-3 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30" aria-label={`Delete ${budget.name}`}><Trash2 className="h-4 w-4" /></button></div></article>)}</div>}</section>
+        <section id="budgets" className="rounded-[2rem] border border-border bg-zinc-50 p-6 dark:bg-zinc-950 sm:p-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <div className="flex items-center gap-2 text-accent"><BellRing className="h-4 w-4" /><p className="text-xs font-bold uppercase tracking-[0.18em]">Monthly guardrails</p></div>
+                    <h2 className="mt-2 text-2xl font-bold font-rounded">Budgets</h2>
+                    <p className="mt-1 text-sm text-zinc-500">Confirmed spending against this month’s active limits.</p>
+                </div>
+                <button disabled={Boolean(budgetError)} onClick={() => setShowBudgetForm(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 text-sm font-bold text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"><Plus className="h-4 w-4" /> New budget</button>
+            </div>
+
+            {loading ? <div className="grid min-h-48 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div> : budgetError ? (
+                <div className="mt-6"><FeatureError error={budgetError} featureLabel="Budget alerts" fallback="We couldn’t load your budgets." /></div>
+            ) : budgets.length === 0 ? (
+                <p className="mt-6 rounded-2xl bg-white p-8 text-center text-sm text-zinc-400 dark:bg-zinc-900">No budgets yet. Add a monthly total or category guardrail.</p>
+            ) : (
+                <>
+                    {budgetProgressError && budgets.some((budget) => budget.active) && <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200"><p className="font-bold">Budget progress is temporarily unavailable</p><p className="mt-1 opacity-75">Your saved limits are still shown below. Refresh to try the confirmed-spending calculation again.</p></div>}
+                    <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {budgets.map((budget) => {
+                            const status = budgetStatusByID.get(budget.id);
+                            const actions = <div className="flex gap-2"><button disabled={workingId === `budget-${budget.id}`} onClick={() => void toggleBudget(budget)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-zinc-100 py-2.5 text-xs font-bold dark:bg-zinc-800">{budget.active ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}{budget.active ? "Pause" : "Resume"}</button><button onClick={() => void deleteBudget(budget)} className="rounded-xl p-3 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30" aria-label={`Delete ${budget.name}`}><Trash2 className="h-4 w-4" /></button></div>;
+                            if (status) return <BudgetProgressCard key={budget.id} budget={status} footer={actions} compact />;
+                            return <article key={budget.id} className="rounded-2xl border border-border bg-white p-5 opacity-70 dark:bg-zinc-900"><div className="flex items-start justify-between gap-4"><div><p className="font-bold">{budget.name}</p><p className="mt-1 text-xs text-zinc-400">{budget.category || "All expenses"}</p></div><span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:bg-zinc-800">{budget.active ? "Unavailable" : "Paused"}</span></div><p className="mt-5 text-xl font-bold font-rounded">{formatMoney(budget.limit_amount)} limit</p><p className="mt-1 text-xs text-zinc-400">{budget.active ? "Confirmed progress could not be loaded." : "Progress is not calculated while this budget is paused."}</p><div className="mt-5 border-t border-border pt-4">{actions}</div></article>;
+                        })}
+                    </div>
+                </>
+            )}
+        </section>
 
         <section id="subscriptions" className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2 text-indigo-600"><CalendarClock className="h-4 w-4" /><p className="text-xs font-bold uppercase tracking-[0.18em]">Recurring payments</p></div><h2 className="mt-2 text-2xl font-bold font-rounded">Subscriptions</h2><p className="mt-1 text-sm text-zinc-500">Review due dates and advance schedules after payment.</p></div><button disabled={Boolean(subscriptionError)} onClick={() => setShowSubscriptionForm(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 text-sm font-bold text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"><Plus className="h-4 w-4" /> Track payment</button></div>{loading ? <div className="grid min-h-48 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-accent" /></div> : subscriptionError ? <div className="mt-6"><FeatureError error={subscriptionError} featureLabel="Recurring payment tracking" fallback="We couldn’t load your subscriptions." /></div> : subscriptions.length === 0 ? <p className="mt-6 rounded-2xl bg-zinc-50 p-8 text-center text-sm text-zinc-400 dark:bg-zinc-800">No recurring payments are being tracked.</p> : <div className="mt-6 divide-y divide-border">{subscriptions.map((subscription) => <article key={subscription.id} className="grid gap-4 py-5 lg:grid-cols-[1fr_auto] lg:items-center"><div className="flex items-start gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30"><ReceiptText className="h-5 w-5" /></span><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">{subscription.name}</h3><span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", subscription.due_state === "overdue" ? "bg-red-50 text-red-600 dark:bg-red-950/30" : subscription.due_state === "due_soon" ? "bg-amber-50 text-amber-600 dark:bg-amber-950/30" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800")}>{subscription.due_state === "due_soon" ? "Due soon" : subscription.due_state === "overdue" ? "Overdue" : "Scheduled"}</span></div><p className="mt-1 text-sm text-zinc-500">{formatMoney(subscription.amount)} · {subscription.billing_interval} · due {formatDate(subscription.next_due_date)}</p><p className="mt-1 text-xs text-zinc-400">{subscription.account?.name || "No account linked"}</p></div></div><div className="flex flex-wrap gap-2"><button disabled={workingId === `subscription-${subscription.id}`} onClick={() => void markPaid(subscription)} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-accent/10 px-4 text-xs font-bold text-accent"><Check className="h-3.5 w-3.5" /> Mark paid</button><button onClick={() => void toggleSubscription(subscription)} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-100 px-4 text-xs font-bold dark:bg-zinc-800">{subscription.status === "active" ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}{subscription.status === "active" ? "Pause" : "Resume"}</button><button onClick={() => void deleteSubscription(subscription)} className="rounded-xl p-3 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30" aria-label={`Delete ${subscription.name}`}><Trash2 className="h-4 w-4" /></button></div></article>)}</div>}</section>
         <section id="planned-tools" className="rounded-[2rem] border border-dashed border-border bg-white p-6 dark:bg-zinc-900 sm:p-8"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-zinc-100 text-zinc-500 dark:bg-zinc-800"><Grid2X2 className="h-5 w-5" /></span><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Coming next</p><h2 className="mt-1 text-2xl font-bold font-rounded">More financial tools</h2></div></div><div className="mt-6 grid gap-4 md:grid-cols-3"><article className="rounded-2xl border border-border p-5"><Home className="h-5 w-5 text-accent" /><h3 className="mt-4 font-bold">HRA calculator</h3><p className="mt-1 text-sm leading-6 text-zinc-500">Estimate rent exemption scenarios once web tax inputs are ready.</p></article><article className="rounded-2xl border border-border p-5"><FileText className="h-5 w-5 text-accent" /><h3 className="mt-4 font-bold">ITR helper</h3><p className="mt-1 text-sm leading-6 text-zinc-500">Organize tax filing checkpoints and record summaries.</p></article><article className="rounded-2xl border border-border p-5"><Grid2X2 className="h-5 w-5 text-accent" /><h3 className="mt-4 font-bold">More calculators</h3><p className="mt-1 text-sm leading-6 text-zinc-500">A placeholder for upcoming mobile-aligned planning tools.</p></article></div></section>
         <aside className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /><p>SIP and EMI results are estimates. Budget and subscription tools organize your own records; they do not connect to lenders, banks, fund houses, or merchants.</p></aside>
-    </div>{showBudgetForm && <BudgetForm onClose={() => setShowBudgetForm(false)} onSaved={() => { setShowBudgetForm(false); void loadPlanning(); }} />}{showSubscriptionForm && <SubscriptionForm accounts={accounts} onClose={() => setShowSubscriptionForm(false)} onSaved={() => { setShowSubscriptionForm(false); void loadPlanning(); }} />}</DashboardLayout>;
+    </div>{showBudgetForm && <BudgetForm onClose={() => setShowBudgetForm(false)} onSaved={() => { setShowBudgetForm(false); void loadPlanning(); }} />}{showSubscriptionForm && <SubscriptionForm accounts={accounts} onClose={() => setShowSubscriptionForm(false)} onSaved={() => { setShowSubscriptionForm(false); void loadPlanning(); }} />}</>;
 }
