@@ -24,6 +24,7 @@ import {
 import { cn } from "@/app/lib/utils";
 import { useAuth } from "@/app/context/AuthContext";
 import { AppNotification, NotificationsAPI } from "@/app/lib/api";
+import { formatDate } from "@/app/lib/format";
 
 const NAV_ITEMS = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -43,7 +44,7 @@ function notificationTime(value: string) {
     if (minutes < 1) return "Just now";
     if (minutes < 60) return `${minutes}m ago`;
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
-    return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+    return formatDate(date);
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

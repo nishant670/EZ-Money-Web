@@ -19,14 +19,8 @@ import {
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import DashboardLayout from "@/app/components/dashboard/DashboardLayout";
 import { Account, AccountsAPI, apiErrorMessage, EntryListParams, ReportsAPI, TransactionReportResponse } from "@/app/lib/api";
+import { formatMoney, toLocalISO } from "@/app/lib/format";
 import { cn } from "@/app/lib/utils";
-
-const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
-
-function isoDate(date: Date) {
-    const offset = date.getTimezoneOffset();
-    return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
-}
 
 function rangeFor(preset: "month" | "30d" | "90d" | "all") {
     if (preset === "all") return {};
@@ -35,7 +29,7 @@ function rangeFor(preset: "month" | "30d" | "90d" | "all") {
     if (preset === "month") start.setDate(1);
     if (preset === "30d") start.setDate(end.getDate() - 29);
     if (preset === "90d") start.setDate(end.getDate() - 89);
-    return { start_date: isoDate(start), end_date: isoDate(end) };
+    return { start_date: toLocalISO(start), end_date: toLocalISO(end) };
 }
 
 function EmptyPanel({ label }: { label: string }) {
@@ -157,9 +151,9 @@ export default function ReportsScreen() {
                     <>
                         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                             {[
-                                { label: "Expense", value: currency.format(report.summary.total_expense), detail: `${report.summary.expense_count} expense records`, icon: ArrowDownRight, tone: "text-rose-600 bg-rose-50 dark:bg-rose-950/30" },
-                                { label: "Income", value: currency.format(report.summary.total_income), detail: `${report.summary.income_count} income records`, icon: ArrowUpRight, tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
-                                { label: "Net cash flow", value: currency.format(report.summary.net_cashflow), detail: report.summary.net_cashflow >= 0 ? "Income above expense" : "Expense above income", icon: Landmark, tone: "text-accent bg-accent/10" },
+                                { label: "Expense", value: formatMoney(report.summary.total_expense), detail: `${report.summary.expense_count} expense records`, icon: ArrowDownRight, tone: "text-rose-600 bg-rose-50 dark:bg-rose-950/30" },
+                                { label: "Income", value: formatMoney(report.summary.total_income), detail: `${report.summary.income_count} income records`, icon: ArrowUpRight, tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
+                                { label: "Net cash flow", value: formatMoney(report.summary.net_cashflow), detail: report.summary.net_cashflow >= 0 ? "Income above expense" : "Expense above income", icon: Landmark, tone: "text-accent bg-accent/10" },
                                 { label: "Records", value: report.summary.transaction_count.toLocaleString("en-IN"), detail: "Matching filters", icon: IndianRupee, tone: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30" },
                             ].map((card) => (
                                 <article key={card.label} className="rounded-[1.75rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900">
@@ -179,12 +173,12 @@ export default function ReportsScreen() {
                                     <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
                                         <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/10 text-accent"><Tags className="h-4 w-4" /></span><div><h2 className="font-bold font-rounded">Category mix</h2><p className="text-xs text-zinc-400">Expense distribution by category</p></div></div>
                                         <div className="mt-7 h-[320px] min-w-0">
-                                            {categoryChart.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={categoryChart} layout="vertical" margin={{ left: 8, right: 8 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" /><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={116} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#71717a" }} /><Tooltip formatter={(value) => currency.format(Number(value))} cursor={{ fill: "rgba(255,136,101,.06)" }} contentStyle={{ borderRadius: 16, border: "1px solid #f0e5e7" }} /><Bar dataKey="amount" fill="#FF8865" radius={[0, 8, 8, 0]} barSize={24} /></BarChart></ResponsiveContainer> : <EmptyPanel label="No expense categories in this range." />}
+                                            {categoryChart.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={categoryChart} layout="vertical" margin={{ left: 8, right: 8 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" /><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={116} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#71717a" }} /><Tooltip formatter={(value) => formatMoney(Number(value))} cursor={{ fill: "rgba(255,136,101,.06)" }} contentStyle={{ borderRadius: 16, border: "1px solid #f0e5e7" }} /><Bar dataKey="amount" fill="#FF8865" radius={[0, 8, 8, 0]} barSize={24} /></BarChart></ResponsiveContainer> : <EmptyPanel label="No expense categories in this range." />}
                                         </div>
                                     </div>
                                     <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
                                         <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30"><Store className="h-4 w-4" /></span><div><h2 className="font-bold font-rounded">Top merchants</h2><p className="text-xs text-zinc-400">Largest expense merchants</p></div></div>
-                                        <div className="mt-6 space-y-2">{report.by_merchant.length ? report.by_merchant.slice(0, 6).map((merchant, index) => <div key={merchant.key} className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-3 dark:bg-zinc-800"><span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xs font-bold text-zinc-500 dark:bg-zinc-900">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{merchant.label}</p><p className="text-xs text-zinc-400">{merchant.transaction_count} records</p></div><p className="text-sm font-bold">{currency.format(merchant.amount)}</p></div>) : <EmptyPanel label="No merchant spending in this range." />}</div>
+                                        <div className="mt-6 space-y-2">{report.by_merchant.length ? report.by_merchant.slice(0, 6).map((merchant, index) => <div key={merchant.key} className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-3 dark:bg-zinc-800"><span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xs font-bold text-zinc-500 dark:bg-zinc-900">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{merchant.label}</p><p className="text-xs text-zinc-400">{merchant.transaction_count} records</p></div><p className="text-sm font-bold">{formatMoney(merchant.amount)}</p></div>) : <EmptyPanel label="No merchant spending in this range." />}</div>
                                     </div>
                                 </section>
 
@@ -192,12 +186,12 @@ export default function ReportsScreen() {
                                     <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
                                         <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30"><CalendarRange className="h-4 w-4" /></span><div><h2 className="font-bold font-rounded">Monthly trend</h2><p className="text-xs text-zinc-400">Expense and income over time</p></div></div>
                                         <div className="mt-7 h-[300px] min-w-0">
-                                            {monthChart.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={monthChart} margin={{ left: 4, right: 12, top: 8, bottom: 4 }}><CartesianGrid vertical={false} stroke="#eee" strokeDasharray="3 3" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#71717a" }} /><YAxis hide /><Tooltip formatter={(value) => currency.format(Number(value))} contentStyle={{ borderRadius: 16, border: "1px solid #f0e5e7" }} /><Line type="monotone" dataKey="expense" stroke="#FF8865" strokeWidth={3} dot={{ r: 3 }} /><Line type="monotone" dataKey="income" stroke="#16a34a" strokeWidth={3} dot={{ r: 3 }} /></LineChart></ResponsiveContainer> : <EmptyPanel label="Monthly trend appears after dated records." />}
+                                            {monthChart.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={monthChart} margin={{ left: 4, right: 12, top: 8, bottom: 4 }}><CartesianGrid vertical={false} stroke="#eee" strokeDasharray="3 3" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#71717a" }} /><YAxis hide /><Tooltip formatter={(value) => formatMoney(Number(value))} contentStyle={{ borderRadius: 16, border: "1px solid #f0e5e7" }} /><Line type="monotone" dataKey="expense" stroke="#FF8865" strokeWidth={3} dot={{ r: 3 }} /><Line type="monotone" dataKey="income" stroke="#16a34a" strokeWidth={3} dot={{ r: 3 }} /></LineChart></ResponsiveContainer> : <EmptyPanel label="Monthly trend appears after dated records." />}
                                         </div>
                                     </div>
                                     <div className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
                                         <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/10 text-accent"><Wallet className="h-4 w-4" /></span><div><h2 className="font-bold font-rounded">Account usage</h2><p className="text-xs text-zinc-400">Expense totals by payment source</p></div></div>
-                                        <div className="mt-6 divide-y divide-border">{report.by_account.length ? report.by_account.map((account) => <div key={`${account.account_id}-${account.account_name}`} className="flex min-h-16 items-center gap-4 py-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{account.account_name}</p><p className="text-xs text-zinc-400">{account.transaction_count} records · {account.percentage.toFixed(1)}%</p></div><p className="text-sm font-bold">{currency.format(account.amount)}</p></div>) : <EmptyPanel label="No account spending in this range." />}</div>
+                                        <div className="mt-6 divide-y divide-border">{report.by_account.length ? report.by_account.map((account) => <div key={`${account.account_id}-${account.account_name}`} className="flex min-h-16 items-center gap-4 py-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{account.account_name}</p><p className="text-xs text-zinc-400">{account.transaction_count} records · {account.percentage.toFixed(1)}%</p></div><p className="text-sm font-bold">{formatMoney(account.amount)}</p></div>) : <EmptyPanel label="No account spending in this range." />}</div>
                                     </div>
                                 </section>
                             </>

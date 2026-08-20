@@ -1,4 +1,5 @@
 import axios, { AxiosError } from "axios";
+import type { AccountType, PaymentMode } from "@/app/lib/accounts";
 
 export interface User {
     id: number;
@@ -22,7 +23,7 @@ export interface AuthResponse {
 export interface Account {
     id: number;
     user_id: number;
-    type: "cash" | "upi" | "bank" | "credit_card" | "debit_card" | "wallet" | "other";
+    type: AccountType;
     name: string;
     color: string;
     provider: string;
@@ -47,7 +48,7 @@ export interface Transaction {
     source: "manual" | "text" | "voice";
     type: "income" | "expense";
     category: string;
-    mode: string;
+    mode: PaymentMode;
     date: string;
     time?: string;
     merchant?: string;
@@ -89,7 +90,9 @@ export interface TransactionInput {
     amount: number;
     currency: "INR";
     source: "manual" | "text" | "voice";
-    mode: "Cash" | "UPI" | "Credit Card" | "Wallets";
+    // Omit for recognised account types; the API derives the canonical mode
+    // from account_id. "Other" accounts must send the user's explicit choice.
+    mode?: PaymentMode;
     category: string;
     merchant?: string;
     tags?: string[];
@@ -475,6 +478,64 @@ export interface NotificationListResponse {
     total_pages: number;
 }
 
+export interface CategoriesResponse {
+    categories: string[];
+    default: string;
+}
+
+export interface EntitlementPayload {
+    error?: string;
+    feature_code?: string;
+    feature_label?: string;
+    required_plan?: string;
+    required_credits?: number;
+    available_credits?: number;
+    daily_limit_remaining?: number;
+    reset_at?: string;
+    upgrade_required?: boolean;
+}
+
+export class EntitlementError extends Error {
+    readonly status: 402 | 403 | 429;
+    readonly code?: string;
+    readonly featureCode?: string;
+    readonly featureLabel?: string;
+    readonly requiredPlan?: string;
+    readonly requiredCredits?: number;
+    readonly availableCredits?: number;
+    readonly dailyLimitRemaining?: number;
+    readonly resetAt?: string;
+    readonly upgradeRequired: boolean;
+
+    constructor(status: 402 | 403 | 429, payload: EntitlementPayload = {}) {
+        super(status === 429 ? "Allowance temporarily exhausted" : "This feature needs a different plan");
+        this.name = "EntitlementError";
+        this.status = status;
+        this.code = payload.error;
+        this.featureCode = payload.feature_code;
+        this.featureLabel = payload.feature_label;
+        this.requiredPlan = payload.required_plan;
+        this.requiredCredits = payload.required_credits;
+        this.availableCredits = payload.available_credits;
+        this.dailyLimitRemaining = payload.daily_limit_remaining;
+        this.resetAt = payload.reset_at;
+        this.upgradeRequired = payload.upgrade_required ?? status !== 429;
+    }
+}
+
+export class SessionExpiredError extends Error {
+    constructor() {
+        super("Your session expired");
+        this.name = "SessionExpiredError";
+    }
+}
+
+export const AUTH_SESSION_EXPIRED_EVENT = "finnri:session-expired";
+
+export function asEntitlementError(error: unknown): EntitlementError | null {
+    return error instanceof EntitlementError ? error : null;
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 export const api = axios.create({
@@ -495,21 +556,40 @@ api.interceptors.response.use(
     (error: AxiosError) => {
         const isAuthenticationRequest = error.config?.url?.startsWith("/v1/auth/");
         if (error.response?.status === 401 && !isAuthenticationRequest && typeof window !== "undefined") {
+            const hadSession = Boolean(localStorage.getItem("finnri_token") || localStorage.getItem("finnri_user"));
             localStorage.removeItem("finnri_token");
             localStorage.removeItem("finnri_user");
+            if (hadSession) window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
+            return Promise.reject(new SessionExpiredError());
+        }
+        const status = error.response?.status;
+        const entitlementPayload = (error.response?.data || {}) as EntitlementPayload;
+        const isEntitlementResponse = status === 402
+            || (status === 403 && Boolean(entitlementPayload.feature_code || entitlementPayload.required_plan || entitlementPayload.upgrade_required))
+            || (status === 429 && Boolean(entitlementPayload.reset_at));
+        if (isEntitlementResponse && (status === 402 || status === 403 || status === 429)) {
+            return Promise.reject(new EntitlementError(
+                status,
+                entitlementPayload,
+            ));
         }
         return Promise.reject(error);
     },
 );
 
 export function apiErrorMessage(error: unknown, fallback: string) {
+    if (error instanceof SessionExpiredError) return "";
+    if (error instanceof EntitlementError) {
+        if (error.status === 429) return error.resetAt ? "Your allowance will be available again at the time shown." : "Your daily allowance will be available again soon.";
+        return error.requiredPlan ? `${error.featureLabel || "This feature"} is included with ${error.requiredPlan}.` : `${error.featureLabel || "This feature"} is not included in this workspace.`;
+    }
     if (!axios.isAxiosError(error)) return fallback;
     if (!error.response) {
         return "Cannot reach the FINNRI API. Confirm the backend is running and allows this web address.";
     }
-    const payload = error.response?.data as { message?: string; error?: string; fields?: Record<string, string> } | undefined;
+    const payload = error.response?.data as { message?: string; fields?: Record<string, string> } | undefined;
     const fieldMessage = payload?.fields ? Object.values(payload.fields)[0] : undefined;
-    return payload?.message || fieldMessage || payload?.error?.replaceAll("_", " ") || fallback;
+    return payload?.message || fieldMessage || fallback;
 }
 
 export const AuthAPI = {
@@ -538,6 +618,10 @@ export const EntriesAPI = {
     }),
     update: (id: number, data: TransactionInput) => api.put<Transaction>(`/v1/entries/${id}`, data),
     delete: (id: number) => api.delete(`/v1/entries/${id}`),
+};
+
+export const CategoriesAPI = {
+    list: () => api.get<CategoriesResponse>("/v1/categories"),
 };
 
 export const DashboardAPI = {

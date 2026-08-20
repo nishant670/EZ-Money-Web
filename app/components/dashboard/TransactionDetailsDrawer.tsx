@@ -12,32 +12,43 @@ import {
     ShieldCheck,
     Copy,
     Loader2,
-    Users
+    Users,
+    Pencil,
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiErrorMessage, EntriesAPI, SplitAPI, SplitBill, Transaction, TransactionInput } from "@/app/lib/api";
+import { apiErrorMessage, EntriesAPI, SplitAPI, SplitBill, Transaction } from "@/app/lib/api";
+import { formatDate, formatMoney, formatTime, toLocalISO } from "@/app/lib/format";
 
 interface TransactionDetailsDrawerProps {
     isOpen: boolean;
     onClose: () => void;
     transaction: Transaction | null;
+    onEdit?: (transaction: Transaction, splitBill: SplitBill | null, splitDataAvailable: boolean) => void;
 }
 
-export default function TransactionDetailsDrawer({ isOpen, onClose, transaction }: TransactionDetailsDrawerProps) {
+export default function TransactionDetailsDrawer({ isOpen, onClose, transaction, onEdit }: TransactionDetailsDrawerProps) {
     const [loading, setLoading] = useState(false);
-    const [splitBill, setSplitBill] = useState<SplitBill | null>(null);
+    const [splitResult, setSplitResult] = useState<{ entryID: number; bill: SplitBill | null; available: boolean } | null>(null);
 
     useEffect(() => {
         let active = true;
         if (!isOpen || !transaction) return;
         SplitAPI.listBills().then((response) => {
-            if (active) setSplitBill(response.data.find((bill) => bill.entry_id === transaction.id) || null);
-        }).catch(() => { if (active) setSplitBill(null); });
+            if (active) setSplitResult({ entryID: transaction.id, bill: response.data.find((bill) => bill.entry_id === transaction.id) || null, available: true });
+        }).catch(() => {
+            if (active) setSplitResult({ entryID: transaction.id, bill: null, available: false });
+        });
         return () => { active = false; };
     }, [isOpen, transaction]);
 
     if (!transaction) return null;
+    const splitMatchesTransaction = splitResult?.entryID === transaction.id;
+    const splitBill = splitMatchesTransaction ? splitResult.bill : null;
+    const splitLoadState = !splitMatchesTransaction ? "loading" : splitResult.available ? "loaded" : "unavailable";
+    const transactionTime = formatTime(transaction.time);
+
+    const handleEdit = () => onEdit?.(transaction, splitBill, splitLoadState === "loaded");
 
     const handleDelete = async () => {
         if (!confirm("Are you sure you want to delete this transaction?")) return;
@@ -55,7 +66,6 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
     const handleDuplicate = async () => {
         setLoading(true);
         try {
-            const normalizedMode: TransactionInput["mode"] = transaction.mode === "UPI" || transaction.mode === "Credit Card" || transaction.mode === "Wallets" ? transaction.mode : "Cash";
             await EntriesAPI.create({
                 title: `${transaction.merchant || transaction.title} (Copy)`,
                 merchant: transaction.merchant,
@@ -63,9 +73,11 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                 currency: "INR",
                 type: transaction.type,
                 source: "manual",
-                mode: normalizedMode,
+                // Duplication is an exact copy, including the stored mode. New
+                // manual entries omit mode and let account_id carry the truth.
+                mode: transaction.mode,
                 category: transaction.category,
-                date: new Date().toISOString().split("T")[0],
+                date: toLocalISO(),
                 time: transaction.time,
                 tags: transaction.tags,
                 notes: transaction.notes,
@@ -117,7 +129,7 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                                     <p className="text-sm text-zinc-400 font-medium">{transaction.category}</p>
                                 </div>
                                 <h5 className={cn("text-4xl font-bold font-rounded", transaction.type === "income" ? "text-green-500" : "dark:text-white")}>
-                                    ₹{transaction.amount}
+                                    {formatMoney(transaction.amount)}
                                 </h5>
                             </div>
 
@@ -126,7 +138,7 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                                 <div className="bg-zinc-50 dark:bg-zinc-800/50 p-6 rounded-3xl space-y-4">
                                     <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-zinc-400">
                                         <span className="flex items-center gap-2"><Clock className="w-3.5 h-3.5" /> Timeline</span>
-                                        <span className="text-zinc-900 dark:text-white">{transaction.date}</span>
+                                        <span className="text-zinc-900 dark:text-white">{formatDate(transaction.date)}{transactionTime ? ` · ${transactionTime}` : ""}</span>
                                     </div>
                                     <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-zinc-400">
                                         <span className="flex items-center gap-2"><Wallet className="w-3.5 h-3.5" /> Account</span>
@@ -141,7 +153,7 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between ml-2">
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Attached Tags</label>
-                                        <button className="text-[10px] font-bold uppercase tracking-widest text-accent hover:underline">+ Manage</button>
+                                        {onEdit && <button onClick={handleEdit} disabled={splitLoadState === "loading"} className="text-[10px] font-bold uppercase tracking-widest text-accent hover:underline disabled:opacity-40">Manage</button>}
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {transaction.tags?.map((tag: string, i: number) => (
@@ -153,12 +165,19 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, transaction 
                                     </div>
                                 </div>
 
-                                {splitBill?.entry_id === transaction.id && <div className="rounded-3xl border border-accent/20 bg-accent/5 p-5"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-accent/10 text-accent"><Users className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-accent">Shared expense</p><p className="mt-1 text-sm font-bold">{splitBill.participants.length} friend share{splitBill.participants.length === 1 ? "" : "s"}</p><p className="mt-2 text-xs leading-5 text-zinc-500">{splitBill.participants.map((participant) => `${participant.friend.name}: ₹${participant.share_amount}`).join(" · ")}</p><Link href="/dashboard/splits" onClick={onClose} className="mt-3 inline-block text-xs font-bold text-accent underline">Open split ledger</Link></div></div></div>}
+                                {splitBill?.entry_id === transaction.id && <div className="rounded-3xl border border-accent/20 bg-accent/5 p-5"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-accent/10 text-accent"><Users className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-accent">Shared expense</p><p className="mt-1 text-sm font-bold">{splitBill.participants.length} friend share{splitBill.participants.length === 1 ? "" : "s"}</p><p className="mt-2 text-xs leading-5 text-zinc-500">{splitBill.participants.map((participant) => `${participant.friend.name}: ${formatMoney(participant.share_amount)}`).join(" · ")}</p><Link href="/dashboard/splits" onClick={onClose} className="mt-3 inline-block text-xs font-bold text-accent underline">Open split ledger</Link></div></div></div>}
                             </div>
                         </div>
 
                         {/* Bottom Actions */}
                         <div className="p-8 border-t border-border bg-zinc-50 dark:bg-zinc-800/50 space-y-3">
+                            {onEdit && <button
+                                onClick={handleEdit}
+                                disabled={loading || splitLoadState === "loading"}
+                                className="w-full flex items-center justify-center gap-3 bg-accent text-white py-4 rounded-2xl font-bold text-sm shadow-xl shadow-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70"
+                            >
+                                <Pencil className="w-4 h-4" /> {splitLoadState === "loading" ? "Loading details…" : "Edit Transaction"}
+                            </button>}
                             <button
                                 onClick={handleDuplicate}
                                 disabled={loading}

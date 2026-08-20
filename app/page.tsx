@@ -17,8 +17,7 @@ import {
   Smartphone,
   Menu,
   X,
-  ArrowDownRight,
-  ChevronDown
+  ArrowDownRight
 } from "lucide-react";
 
 export default function Home() {
@@ -49,11 +48,11 @@ export default function Home() {
             <Link href="#features" className="text-sm font-medium hover:text-accent transition-colors">Features</Link>
             <Link href="#how-it-works" className="text-sm font-medium hover:text-accent transition-colors">How it works</Link>
             <Link href="#security" className="text-sm font-medium hover:text-accent transition-colors">Security</Link>
-            <Link href="#pricing" className="text-sm font-medium hover:text-accent transition-colors">Pricing</Link>
+            <Link href="#availability" className="text-sm font-medium hover:text-accent transition-colors">Availability</Link>
             <Link href="/tools" className="text-sm font-medium hover:text-accent transition-colors">Free Tools</Link>
             <Link href="/login" className="text-sm font-semibold text-accent hover:opacity-80 transition-opacity">Web Dashboard</Link>
-            <Link href="#download" className="bg-accent text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-accent/30 hover:scale-105 active:scale-95 transition-all">
-              Download App
+            <Link href="/login" className="bg-accent text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-accent/30 hover:scale-105 active:scale-95 transition-all">
+              Open Finnri
             </Link>
           </div>
 
@@ -70,12 +69,12 @@ export default function Home() {
               <Link href="#features" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Features</Link>
               <Link href="#how-it-works" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">How it works</Link>
               <Link href="#security" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Security</Link>
-              <Link href="#pricing" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Pricing</Link>
+              <Link href="#availability" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Availability</Link>
               <Link href="/tools" className="text-lg font-medium">Free Tools</Link>
               <div className="h-px bg-border my-2" />
               <Link href="/login" className="text-lg font-bold text-accent">Web Dashboard Login</Link>
-              <Link href="#download" className="bg-accent text-white px-6 py-4 rounded-2xl text-center font-bold shadow-lg">
-                Download App
+              <Link href="/login" onClick={() => setIsMenuOpen(false)} className="bg-accent text-white px-6 py-4 rounded-2xl text-center font-bold shadow-lg">
+                Open Finnri
               </Link>
             </div>
           </div>
@@ -95,23 +94,20 @@ export default function Home() {
                 Money, made <span className="text-accent underline decoration-accent/20 underline-offset-8">intelligent.</span>
               </h1>
               <p className="text-xl text-text-muted mb-10 leading-relaxed max-w-lg">
-                Track expenses & income instantly with AI. Just speak — Finnri understands, categorizes, and stays in your control.
+                Record expenses and income by voice, text, or manual entry. Finnri can suggest the details; you review every record before it is saved.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <Link href="#" className="flex items-center justify-center gap-2 bg-foreground text-background px-8 py-4 rounded-2xl font-bold hover:opacity-90 transition-all shadow-xl shadow-foreground/10 group">
-                  <Smartphone className="w-5 h-5" />
-                  Download for Android
+                <Link href="/login" className="flex items-center justify-center gap-2 bg-foreground text-background px-8 py-4 rounded-2xl font-bold hover:opacity-90 transition-all shadow-xl shadow-foreground/10 group">
+                  <LayoutDashboard className="w-5 h-5" />
+                  Open Web Dashboard
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
-                <Link href="#" className="flex items-center justify-center gap-2 bg-white dark:bg-zinc-800 border border-border px-8 py-4 rounded-2xl font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all shadow-md">
-                  <Smartphone className="w-5 h-5 text-accent" />
-                  Download for iOS
+                <Link href="/tools" className="flex items-center justify-center gap-2 bg-white dark:bg-zinc-800 border border-border px-8 py-4 rounded-2xl font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all shadow-md">
+                  <TrendingUp className="w-5 h-5 text-accent" />
+                  Explore Free Tools
                 </Link>
               </div>
-              <Link href="/login" className="inline-flex items-center gap-2 text-text-muted hover:text-accent font-medium transition-colors mb-12">
-                Try Web Dashboard <ArrowRight className="w-4 h-4" />
-              </Link>
 
               <div className="flex flex-wrap gap-8 items-center border-t border-border pt-8">
                 <div className="flex items-center gap-2">
@@ -150,7 +146,7 @@ export default function Home() {
         <div className="container mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">Effortless Tracking in 3 Steps</h2>
-            <p className="text-text-muted">Say goodbye to manual entry. Finnri makes managing money as easy as talking.</p>
+            <p className="text-text-muted">Choose the capture method that suits the moment, then confirm the record before it reaches your ledger.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -158,17 +154,17 @@ export default function Home() {
               {
                 icon: <Mic className="w-8 h-8" />,
                 title: "Speak or type",
-                desc: "Just say 'Ordered pizza for ₹450' or type a quick note. Voice-first design for speed."
+                desc: "On mobile, speak a transaction; on mobile or web, type a quick note or use the manual form."
               },
               {
                 icon: <Brain className="w-8 h-8" />,
                 title: "AI extracts details",
-                desc: "Our smart AI identifies amount, merchant, and category instantly. No more manual tagging."
+                desc: "AI can suggest the amount, merchant, category, account, and date from what you entered."
               },
               {
                 icon: <CheckCircle2 className="w-8 h-8" />,
                 title: "You confirm & save",
-                desc: "Always in control. Review the details, tap confirm, and it's securely saved in your accounts."
+                desc: "Check the draft, correct anything that is wrong, then save the confirmed record to your ledger."
               }
             ].map((step, i) => (
               <div key={i} className="bg-white dark:bg-zinc-800 p-8 rounded-[2rem] shadow-sm hover:shadow-xl transition-all border border-border group relative overflow-hidden">
@@ -191,7 +187,7 @@ export default function Home() {
         <div className="container mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">Powerful Features, Zero Clutter</h2>
-            <p className="text-text-muted">Everything you need to manage personal & business finances intelligently.</p>
+            <p className="text-text-muted">Practical tools for recording day-to-day money and understanding confirmed transactions.</p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -199,22 +195,22 @@ export default function Home() {
               {
                 icon: <Mic className="w-6 h-6" />,
                 title: "Voice-first Tracking",
-                desc: "Designed for the move. Speak your expenses as they happen."
+                desc: "Use mobile voice capture when it is convenient, with a review step before saving."
               },
               {
                 icon: <PieChart className="w-6 h-6" />,
                 title: "Smart Categorization",
-                desc: "AI automatically puts your spending into logical buckets."
+                desc: "AI suggests a category from Finnri's shared list; you can correct it before saving."
               },
               {
                 icon: <Wallet className="w-6 h-6" />,
                 title: "Multi-Account Tracking",
-                desc: "Organize cash, bank, wallet, UPI, and card spending in one place."
+                desc: "Label cash, bank, wallet, UPI, and card accounts you maintain yourself. Finnri does not connect to banks."
               },
               {
                 icon: <TrendingUp className="w-6 h-6" />,
                 title: "Insights & Trends",
-                desc: "Visualize your spending patterns with beautiful, easy charts."
+                desc: "Compare totals and patterns calculated from the transactions you have confirmed."
               },
               {
                 icon: <ShieldCheck className="w-6 h-6" />,
@@ -244,13 +240,13 @@ export default function Home() {
         <div className="container mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl lg:text-5xl font-bold mb-8 font-rounded leading-tight">Built for every financial journey.</h2>
+              <h2 className="text-3xl lg:text-5xl font-bold mb-8 font-rounded leading-tight">Built around everyday records.</h2>
               <div className="space-y-6">
                 {[
                   { title: "Track UPI spending", icon: <Smartphone className="text-accent" /> },
-                  { title: "Manage credit card expenses", icon: <CreditCard className="text-accent" /> },
-                  { title: "Personal budgeting made easy", icon: <Wallet className="text-accent" /> },
-                  { title: "Business & freelance tracking", icon: <TrendingUp className="text-accent" /> }
+                  { title: "Label credit card expenses", icon: <CreditCard className="text-accent" /> },
+                  { title: "Set category budgets", icon: <Wallet className="text-accent" /> },
+                  { title: "Separate freelance records with tags", icon: <TrendingUp className="text-accent" /> }
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl hover:bg-white/10 transition-colors border border-white/10">
                     <div className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-xl">
@@ -287,7 +283,7 @@ export default function Home() {
               </div>
               <div className="mt-8 relative z-10">
                 <p className="text-2xl font-bold mb-2">Detailed insights at your fingertips.</p>
-                <p className="text-zinc-400">Visualize where every rupee goes with real-time analytics.</p>
+                <p className="text-zinc-400">See category and merchant totals calculated from your confirmed records.</p>
               </div>
               {/* Decorative dots */}
               {[...Array(20)].map((_, i) => (
@@ -376,7 +372,7 @@ export default function Home() {
               </div>
             </div>
             <div className="md:w-1/2 p-12 flex flex-col justify-center">
-              <h2 className="text-3xl font-bold mb-6 font-rounded">Bank-grade security. <br />Privacy by design.</h2>
+              <h2 className="text-3xl font-bold mb-6 font-rounded">Clear data boundaries. <br />Privacy by design.</h2>
               <ul className="space-y-4 text-text-muted">
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-accent mt-0.5" />
@@ -388,15 +384,15 @@ export default function Home() {
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-accent mt-0.5" />
                   <div>
-                    <span className="font-bold text-foreground">End-to-end Encryption</span>
-                    <p className="text-sm">Secure storage and communication for all your records.</p>
+                    <span className="font-bold text-foreground">Encrypted in transit and at rest</span>
+                    <p className="text-sm">Production connections and stored records are protected with encryption.</p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-accent mt-0.5" />
                   <div>
-                    <span className="font-bold text-foreground">No forced bank sync</span>
-                    <p className="text-sm">You decide what to import. Use voice, type, or manual sync.</p>
+                    <span className="font-bold text-foreground">No bank connection</span>
+                    <p className="text-sm">Finnri does not connect to your bank. You add records by voice, text, or manual entry.</p>
                   </div>
                 </li>
               </ul>
@@ -405,111 +401,38 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-24 bg-accent-secondary/10">
-        <div className="container mx-auto px-6">
-          <h2 className="text-3xl lg:text-4xl font-bold text-center mb-16 font-rounded">Loved by thousands.</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { name: "Rahul S.", role: "Software Engineer", quote: "Voice tracking is a game changer for my UPI spends." },
-              { name: "Priya V.", role: "Freelance Designer", quote: "Finally, an app that doesn't force me to sync my bank." },
-              { name: "Arjun & Sneha", role: "Couple", quote: "Perfect for managing our shared household expenses." },
-              { name: "Karan M.", role: "Student", quote: "The AI understands everything. Tracking is finally fun." }
-            ].map((t, i) => (
-              <div key={i} className="bg-white dark:bg-zinc-800 p-8 rounded-3xl border border-border shadow-sm">
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, j) => <CheckCircle2 key={j} className="w-4 h-4 text-accent fill-accent" />)}
-                </div>
-                <p className="italic text-text-muted mb-6">&ldquo;{t.quote}&rdquo;</p>
-                <div>
-                  <p className="font-bold font-rounded">{t.name}</p>
-                  <p className="text-xs text-text-muted">{t.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="py-24">
+      {/* Availability Section */}
+      <section id="availability" className="py-24 bg-accent-secondary/10">
         <div className="container mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">Simple Plans for Everyone</h2>
-            <p className="text-text-muted">Start for free, upgrade when you need more power.</p>
+            <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">What is available today</h2>
+            <p className="text-text-muted">Start with the features that ship now. No paid plan is currently offered on this website.</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <div className="p-8 rounded-[2rem] border border-border bg-white dark:bg-zinc-800 flex flex-col justify-between">
               <div>
                 <h3 className="text-2xl font-bold mb-2">Finnri Free</h3>
-                <p className="text-text-muted mb-6">Essential tracking for everyone.</p>
+                <p className="text-text-muted mb-6">Core tracking and a limited AI trial.</p>
                 <div className="text-4xl font-bold mb-8 font-rounded">₹0 <span className="text-sm font-normal text-zinc-400">/mo</span></div>
                 <ul className="space-y-4 mb-8">
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Voice & Text tracking</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> AI Categorization</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Basic Insights</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Up to 3 accounts</li>
+                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Manual transaction and account tracking</li>
+                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Search, filters, and basic dashboard totals</li>
+                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> CSV export of transaction views</li>
+                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Limited trial credits for AI capture</li>
                 </ul>
               </div>
-              <button className="w-full py-4 rounded-2xl border-2 border-foreground font-bold hover:bg-foreground hover:text-background transition-all">Current Plan</button>
+              <Link href="/login" className="w-full py-4 rounded-2xl border-2 border-foreground text-center font-bold hover:bg-foreground hover:text-background transition-all">Get started</Link>
             </div>
-            <div className="p-8 rounded-[2rem] border-2 border-accent bg-accent/5 dark:bg-accent/10 relative overflow-hidden flex flex-col justify-between">
+            <div className="p-8 rounded-[2rem] border border-border bg-white/60 dark:bg-zinc-800/60 relative overflow-hidden flex flex-col justify-between">
               <div className="absolute top-4 right-4 bg-accent text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Coming Soon</div>
               <div>
-                <h3 className="text-2xl font-bold mb-2">Finnri Pro</h3>
-                <p className="text-text-muted mb-6">Advanced power for finances.</p>
-                <div className="text-4xl font-bold mb-8 font-rounded">₹199 <span className="text-sm font-normal text-zinc-400">/mo</span></div>
-                <ul className="space-y-4 mb-8">
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Unlimited accounts</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> CSV & PDF Exports</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Automation rules</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Detailed tax reports</li>
-                </ul>
+                <h3 className="text-2xl font-bold mb-2">Paid plans</h3>
+                <p className="text-text-muted mb-6">Not available for purchase yet.</p>
+                <p className="text-sm leading-6 text-text-muted">Prices and paid features will be published only after checkout, renewal, cancellation, and support flows are ready. Finnri does not currently sell a Pro subscription from this site.</p>
               </div>
-              <button className="w-full py-4 rounded-2xl bg-accent text-white font-bold shadow-lg shadow-accent/30 opacity-80 cursor-not-allowed">Join Waitlist</button>
+              <div className="mt-8 w-full rounded-2xl bg-zinc-100 py-4 text-center text-sm font-bold text-zinc-500 dark:bg-zinc-900" aria-label="Paid plans coming soon">Coming soon</div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Blog Preview */}
-      <section className="py-24 bg-zinc-50 dark:bg-zinc-900">
-        <div className="container mx-auto px-6">
-          <div className="flex items-end justify-between mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold font-rounded">Wealth Wisdom</h2>
-            <Link href="#" className="hidden sm:flex items-center gap-2 text-accent font-bold">View all posts <ArrowRight className="w-4 h-4" /></Link>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                tag: "Knowledge",
-                title: "How to track expenses automatically in India",
-                date: "Jan 12, 2026",
-                image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80"
-              },
-              {
-                tag: "Comparison",
-                title: "UPI vs Credit Card: Spending patterns revealed",
-                date: "Jan 08, 2026",
-                image: "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=800&q=80"
-              },
-              {
-                tag: "Guides",
-                title: "Best way to manage monthly subscriptions",
-                date: "Jan 03, 2026",
-                image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=800&q=80"
-              }
-            ].map((post, i) => (
-              <div key={i} className="group cursor-pointer">
-                <div className="relative h-48 rounded-2xl overflow-hidden mb-6 shadow-sm">
-                  <Image src={post.image} alt={post.title} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-accent">{post.tag}</div>
-                </div>
-                <div className="text-sm text-text-muted mb-2 font-medium">{post.date}</div>
-                <h3 className="text-xl font-bold font-rounded group-hover:text-accent transition-colors leading-snug">{post.title}</h3>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -520,16 +443,13 @@ export default function Home() {
           <h2 className="text-3xl lg:text-4xl font-bold text-center mb-12 font-rounded">Frequently Asked Questions</h2>
           <div className="space-y-4">
             {[
-              { q: "Do I need to connect my bank?", a: "No. Finnri is designed to give you options. You can use voice input, manual entry, or choose to sync via secure providers if you want full automation. You are never forced to link your bank accounts." },
-              { q: "How does voice input work?", a: "Just tap the microphone icon in the mobile app and speak naturally. For example, 'Paid ₹1200 for electricity bill'. Our AI extracts the amount, merchant, and category, then asks for your confirmation." },
-              { q: "Is my data safe?", a: "Extremely. We use industry-standard encryption to protect your data. More importantly, we operate on a 'Privacy First' model. We don't sell your data, and we don't have access to your bank passwords." },
-              { q: "Can I export my data?", a: "Yes, Pro users can export their data in CSV or PDF formats at any time. We believe your data belongs to you." }
+              { q: "Do I need to connect my bank?", a: "No. Finnri does not connect to banks or automatically import bank activity. You record transactions yourself by voice, text, or manual entry and maintain your own account labels and balances." },
+              { q: "How does voice input work?", a: "In the mobile app, tap the microphone and speak naturally. Finnri sends the audio for transcription, creates an editable draft, and waits for your confirmation before saving a transaction." },
+              { q: "What happens to voice and text drafts?", a: "Voice audio is held only long enough to transcribe it. Parse attempts, raw provider prompts, and raw provider responses are not persisted. A confirmed transaction may retain its source text as editable provenance." },
+              { q: "Can I export my data?", a: "Yes. CSV export of the current transaction view is available today. PDF export is not available on the web, and CSV is not advertised as a paid-only feature." }
             ].map((faq, i) => (
               <div key={i} className="border border-border rounded-2xl p-6 bg-white dark:bg-zinc-800">
-                <h4 className="text-lg font-bold mb-3 flex items-center justify-between">
-                  {faq.q}
-                  <ChevronDown className="w-5 h-5 text-text-muted" />
-                </h4>
+                <h3 className="text-lg font-bold mb-3">{faq.q}</h3>
                 <p className="text-text-muted leading-relaxed">{faq.a}</p>
               </div>
             ))}
@@ -538,7 +458,7 @@ export default function Home() {
       </section>
 
       {/* Footer CTA */}
-      <section id="download" className="py-24 px-6">
+      <section id="get-started" className="py-24 px-6">
         <div className="container mx-auto">
           <div className="bg-accent rounded-[3rem] p-12 lg:p-24 text-center text-white relative overflow-hidden shadow-2xl shadow-accent/40">
             {/* Decorative circles */}
@@ -546,23 +466,17 @@ export default function Home() {
             <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-black/10 rounded-full blur-3xl" />
 
             <div className="relative z-10">
-              <h2 className="text-4xl lg:text-6xl font-bold mb-8 font-rounded leading-tight">Start tracking smarter today.</h2>
-              <p className="text-white/80 text-xl mb-12 max-w-2xl mx-auto">Download the Finnri app and take control of your financial intelligence in seconds.</p>
+              <h2 className="text-4xl lg:text-6xl font-bold mb-8 font-rounded leading-tight">Start with Finnri on the web.</h2>
+              <p className="text-white/80 text-xl mb-12 max-w-2xl mx-auto">Create an account or continue as a guest to record transactions and explore the dashboard.</p>
 
               <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-                <Link href="#" className="flex items-center gap-3 bg-white text-accent px-10 py-5 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
-                  <Smartphone className="w-6 h-6" />
-                  Google Play Store
+                <Link href="/login" className="flex items-center gap-3 bg-white text-accent px-10 py-5 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
+                  <LayoutDashboard className="w-6 h-6" />
+                  Open Web Dashboard
                 </Link>
-                <Link href="#" className="flex items-center gap-3 bg-zinc-900 text-white px-10 py-5 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
-                  <Smartphone className="w-6 h-6" />
-                  Apple App Store
-                </Link>
-              </div>
-
-              <div className="mt-12">
-                <Link href="/login" className="text-white hover:underline text-lg font-medium opacity-80 hover:opacity-100 transition-opacity">
-                  Login to Web Dashboard
+                <Link href="/tools" className="flex items-center gap-3 bg-zinc-900 text-white px-10 py-5 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
+                  <TrendingUp className="w-6 h-6" />
+                  Use Free Tools
                 </Link>
               </div>
             </div>
@@ -581,14 +495,12 @@ export default function Home() {
             </div>
 
             <div className="flex flex-wrap justify-center gap-8 text-sm font-medium text-text-muted">
-              <Link href="#" className="hover:text-accent transition-colors">Privacy Policy</Link>
-              <Link href="#" className="hover:text-accent transition-colors">Terms of Service</Link>
-              <Link href="#" className="hover:text-accent transition-colors">Contact Us</Link>
-              <Link href="#" className="hover:text-accent transition-colors">Twitter</Link>
-              <Link href="#" className="hover:text-accent transition-colors">Instagram</Link>
+              <Link href="/privacy" className="hover:text-accent transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-accent transition-colors">Terms of Service</Link>
+              <a href="mailto:support@finnri.app?subject=Finnri%20Support" className="hover:text-accent transition-colors">Contact Support</a>
             </div>
 
-            <p className="text-xs text-text-muted">© 2026 Finnri Technologies. Made with ❤️ for India.</p>
+            <p className="text-xs text-text-muted">© 2026 Finnri. Built for day-to-day money tracking in India.</p>
           </div>
         </div>
       </footer>

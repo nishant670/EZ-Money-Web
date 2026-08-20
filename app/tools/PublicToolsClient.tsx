@@ -19,13 +19,8 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { formatMoney } from "@/app/lib/format";
 import { cn } from "@/app/lib/utils";
-
-const currency = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0,
-});
 
 type ActiveCalculator = "sip" | "emi";
 type SIPPresetID = "mutual_fund" | "ppf" | "nps" | "rd" | "custom";
@@ -317,11 +312,11 @@ export default function PublicToolsClient() {
                 </form>
                 <ResultPanel
                   title="Estimated maturity value"
-                  primary={sipResult ? currency.format(sipResult.maturityValue) : "Calculate to view"}
+                  primary={sipResult ? formatMoney(sipResult.maturityValue) : "Calculate to view"}
                   empty={!sipResult}
                   metrics={sipResult ? [
-                    { label: "Invested amount", value: currency.format(sipResult.investedAmount) },
-                    { label: "Estimated returns", value: currency.format(sipResult.estimatedReturns), accent: true },
+                    { label: "Invested amount", value: formatMoney(sipResult.investedAmount) },
+                    { label: "Estimated returns", value: formatMoney(sipResult.estimatedReturns), accent: true },
                   ] : []}
                 >
                   {sipResult && (
@@ -332,7 +327,7 @@ export default function PublicToolsClient() {
                       {showSIPBreakdown && (
                         <ScheduleTable
                           headers={["Year", "Invested", "Value"]}
-                          rows={sipResult.breakdown.map((row) => [String(row.year), currency.format(row.yearlyInvestment), currency.format(row.yearEndValue)])}
+                          rows={sipResult.breakdown.map((row) => [String(row.year), formatMoney(row.yearlyInvestment), formatMoney(row.yearEndValue)])}
                         />
                       )}
                     </>
@@ -365,11 +360,11 @@ export default function PublicToolsClient() {
                 </form>
                 <ResultPanel
                   title="Estimated monthly EMI"
-                  primary={emiResult ? currency.format(emiResult.monthlyEMI) : "Calculate to view"}
+                  primary={emiResult ? formatMoney(emiResult.monthlyEMI) : "Calculate to view"}
                   empty={!emiResult}
                   metrics={emiResult ? [
-                    { label: "Total payment", value: currency.format(emiResult.totalPayment) },
-                    { label: "Total interest", value: currency.format(emiResult.totalInterest), accent: true },
+                    { label: "Total payment", value: formatMoney(emiResult.totalPayment) },
+                    { label: "Total interest", value: formatMoney(emiResult.totalInterest), accent: true },
                   ] : []}
                 >
                   {emiResult && (
@@ -380,7 +375,7 @@ export default function PublicToolsClient() {
                       {showEMISchedule && (
                         <ScheduleTable
                           headers={["Month", "Principal", "Interest", "Balance"]}
-                          rows={emiResult.schedule.map((row) => [String(row.month), currency.format(row.principalAmount), currency.format(row.interestAmount), currency.format(row.closingBalance)])}
+                          rows={emiResult.schedule.map((row) => [String(row.month), formatMoney(row.principalAmount), formatMoney(row.interestAmount), formatMoney(row.closingBalance)])}
                         />
                       )}
                     </>

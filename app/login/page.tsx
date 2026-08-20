@@ -48,7 +48,7 @@ function webDeviceID() {
 
 export default function LoginPage() {
     const router = useRouter();
-    const { login, loginAsGuest, user } = useAuth();
+    const { login, loginAsGuest, user, token, isLoading: authIsLoading } = useAuth();
     const googleButtonRef = useRef<HTMLDivElement | null>(null);
     const [step, setStep] = useState<LoginStep>("choice");
     const [authMode, setAuthMode] = useState<AuthMode>("login");
@@ -60,7 +60,20 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const googleNonce = useRef<string>("");
+
+    useEffect(() => {
+        if (!authIsLoading && token) router.replace("/dashboard");
+    }, [authIsLoading, router, token]);
+
+    useEffect(() => {
+        const authNotice = sessionStorage.getItem("finnri_auth_notice");
+        if (authNotice) {
+            setNotice(authNotice);
+            sessionStorage.removeItem("finnri_auth_notice");
+        }
+    }, []);
 
     useEffect(() => {
         if (step !== "choice" || !googleButtonRef.current) return;
@@ -255,6 +268,10 @@ export default function LoginPage() {
         setLoginType(type); setIdentifier(""); setError(null); setStep("identifier");
     };
 
+    if (authIsLoading || token) {
+        return <main className="grid min-h-screen place-items-center bg-[#FDF5F7] text-sm font-semibold text-zinc-500 dark:bg-zinc-950">Opening your dashboard…</main>;
+    }
+
     return (
         <main className="min-h-screen bg-[#FDF5F7] p-4 dark:bg-zinc-950 sm:grid sm:place-items-center sm:p-6">
             <div className="mx-auto flex min-h-[680px] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-white shadow-2xl shadow-accent/5 dark:bg-zinc-900 sm:rounded-[2.5rem]">
@@ -265,6 +282,7 @@ export default function LoginPage() {
                     </Link>
 
                     <div className="mt-8">
+                        {notice && <div role="status" className="mb-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{notice}</span></div>}
                         {error && <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-600 dark:bg-red-950/30 dark:text-red-300"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span></div>}
 
                         {step === "choice" && <div className="space-y-3">

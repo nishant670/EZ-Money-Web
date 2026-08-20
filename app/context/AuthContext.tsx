@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, AuthAPI } from "@/app/lib/api";
+import { AUTH_SESSION_EXPIRED_EVENT, User, AuthAPI } from "@/app/lib/api";
 import { useRouter } from "next/navigation";
 
 interface AuthContextType {
@@ -9,6 +9,7 @@ interface AuthContextType {
     token: string | null;
     isLoading: boolean;
     login: (token: string, user: User) => void;
+    updateUser: (user: User) => void;
     logout: () => void;
     loginAsGuest: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
     token: null,
     isLoading: true,
     login: () => { },
+    updateUser: () => { },
     logout: () => { },
     loginAsGuest: async () => { },
 });
@@ -47,11 +49,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return () => window.clearTimeout(restoreTimer);
     }, []);
 
+    useEffect(() => {
+        const expireSession = () => {
+            setToken(null);
+            setUser(null);
+            sessionStorage.setItem("finnri_auth_notice", "Your session expired. Sign in again to continue.");
+            router.replace("/login");
+        };
+        window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, expireSession);
+        return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, expireSession);
+    }, [router]);
+
     const login = (newToken: string, newUser: User) => {
         setToken(newToken);
         setUser(newUser);
         localStorage.setItem("finnri_token", newToken);
         localStorage.setItem("finnri_user", JSON.stringify(newUser));
+        sessionStorage.removeItem("finnri_auth_notice");
+    };
+
+    const updateUser = (updatedUser: User) => {
+        setUser(updatedUser);
+        localStorage.setItem("finnri_user", JSON.stringify(updatedUser));
     };
 
     const logout = () => {
@@ -79,7 +98,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, isLoading, login, logout, loginAsGuest }}>
+        <AuthContext.Provider value={{ user, token, isLoading, login, updateUser, logout, loginAsGuest }}>
             {children}
         </AuthContext.Provider>
     );

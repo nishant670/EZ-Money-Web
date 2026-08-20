@@ -16,10 +16,9 @@ import {
     SplitParticipantInput,
     SplitSettlementInput,
 } from "@/app/lib/api";
+import { formatMoney, toLocalISO } from "@/app/lib/format";
 
 const fieldClass = "min-h-11 w-full rounded-xl border border-border bg-zinc-50 px-4 py-3 text-sm outline-none focus:border-accent/30 focus:ring-4 focus:ring-accent/10 dark:bg-zinc-800";
-const today = () => new Date().toISOString().slice(0, 10);
-
 function DialogShell({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
     return <div className="fixed inset-0 z-[120] grid place-items-center bg-zinc-950/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="split-dialog-title">
         <div className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-border bg-white shadow-2xl dark:bg-zinc-900">
@@ -86,7 +85,7 @@ function emptyParticipant(): SplitParticipantInput { return { friend_id: 0, shar
 export function BillDialog({ bill, friends, groups, onClose, onSaved }: { bill?: SplitBill; friends: SplitFriend[]; groups: SplitGroup[]; onClose: () => void; onSaved: () => void }) {
     const [form, setForm] = useState<BillDraft>({
         entry_id: bill?.entry_id || null, group_id: bill?.group_id || null, title: bill?.title || "", total_amount: bill?.total_amount || 0,
-        currency: "INR", date: bill?.date || today(), notes: bill?.notes || "",
+        currency: "INR", date: bill?.date || toLocalISO(), notes: bill?.notes || "",
         participants: bill?.participants?.map((participant) => ({ friend_id: participant.friend_id, share_amount: participant.share_amount, direction: participant.direction })) || [emptyParticipant()],
     });
     const [saving, setSaving] = useState(false);
@@ -117,7 +116,7 @@ export function BillDialog({ bill, friends, groups, onClose, onSaved }: { bill?:
     return <DialogShell title={bill ? "Edit split bill" : "Add a split bill"} description="Record who owes whom without changing the original transaction." onClose={onClose}>
         <form onSubmit={submit}><div className="space-y-6 p-6">
             <div className="grid gap-4 sm:grid-cols-2"><label className="space-y-2 sm:col-span-2"><span className="text-xs font-bold text-zinc-500">Bill title</span><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Dinner at Social" className={fieldClass} /></label><label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Total amount</span><input required min="0.01" step="0.01" type="number" value={form.total_amount || ""} onChange={(event) => setForm({ ...form, total_amount: Number(event.target.value) })} className={fieldClass} /></label><label className="space-y-2"><span className="text-xs font-bold text-zinc-500">Date</span><input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className={fieldClass} /></label><label className="space-y-2 sm:col-span-2"><span className="text-xs font-bold text-zinc-500">Group <span className="font-normal text-zinc-400">optional</span></span><select value={form.group_id || ""} onChange={(event) => chooseGroup(event.target.value)} className={fieldClass}><option value="">No group</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label></div>
-            <div><div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-bold">Friend shares</p><p className="text-xs text-zinc-400">{sharesTotal.toLocaleString("en-IN", { style: "currency", currency: "INR" })} of {Number(form.total_amount || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p></div><button type="button" onClick={splitEqually} className="inline-flex items-center gap-2 rounded-xl bg-accent/10 px-3 py-2 text-xs font-bold text-accent"><Equal className="h-4 w-4" /> Equal shares</button></div>
+            <div><div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-bold">Friend shares</p><p className="text-xs text-zinc-400">{formatMoney(sharesTotal)} of {formatMoney(form.total_amount)}</p></div><button type="button" onClick={splitEqually} className="inline-flex items-center gap-2 rounded-xl bg-accent/10 px-3 py-2 text-xs font-bold text-accent"><Equal className="h-4 w-4" /> Equal shares</button></div>
                 <div className="space-y-3">{form.participants.map((participant, index) => <div key={index} className="grid gap-2 rounded-2xl border border-border p-3 sm:grid-cols-[1fr_130px_170px_auto]">
                     <select required value={participant.friend_id || ""} onChange={(event) => updateParticipant(index, { friend_id: Number(event.target.value) })} className={fieldClass}><option value="">Choose friend</option>{friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.name}</option>)}</select>
                     <input required min="0.01" step="0.01" type="number" aria-label={`Share amount ${index + 1}`} value={participant.share_amount || ""} onChange={(event) => updateParticipant(index, { share_amount: Number(event.target.value) })} placeholder="Share" className={fieldClass} />
@@ -133,7 +132,7 @@ export function BillDialog({ bill, friends, groups, onClose, onSaved }: { bill?:
 }
 
 export function SettlementDialog({ friends, suggestedFriend, onClose, onSaved }: { friends: SplitFriend[]; suggestedFriend?: SplitFriend; onClose: () => void; onSaved: () => void }) {
-    const [form, setForm] = useState<SplitSettlementInput>({ friend_id: suggestedFriend?.id || 0, amount: 0, direction: "friend_paid_user", date: today(), notes: "" });
+    const [form, setForm] = useState<SplitSettlementInput>({ friend_id: suggestedFriend?.id || 0, amount: 0, direction: "friend_paid_user", date: toLocalISO(), notes: "" });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const submit = async (event: FormEvent) => {
