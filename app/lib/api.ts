@@ -357,6 +357,19 @@ export interface RecurringCandidate {
     review_due: boolean;
 }
 
+export interface RecurringCandidateDecision {
+    id: number;
+    user_id: number;
+    candidate_key: string;
+    merchant: string;
+    category: string;
+    decision: "dismissed" | "snoozed" | "tracked";
+    snoozed_until?: string;
+    last_reviewed_at: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface DashboardResponse {
     period: { start: string; end: string };
     summary: DashboardSummary;
@@ -451,6 +464,11 @@ export interface Subscription {
     status: "active" | "paused" | "cancelled";
     reminder_days: number;
     cancel_before_due: boolean;
+    cancel_on_date: string;
+    autopay: boolean;
+    payment_mode: string;
+    transaction_tag: string;
+    purpose_type: string;
     notes: string;
     days_until_due: number;
     due_state: "scheduled" | "due_soon" | "overdue" | "paused" | "cancelled" | "unknown";
@@ -463,23 +481,10 @@ export type SubscriptionInput = Omit<
     "id" | "user_id" | "account" | "days_until_due" | "due_state" | "created_at" | "updated_at"
 >;
 
-export interface EMICalculation {
-    principal_amount: number;
-    currency: "INR";
-    annual_interest_rate_percent: number;
-    tenure_months: number;
-    monthly_emi: number;
-    total_payment: number;
-    total_interest: number;
-    schedule: Array<{
-        month: number;
-        opening_balance: number;
-        payment_amount: number;
-        principal_amount: number;
-        interest_amount: number;
-        closing_balance: number;
-    }>;
-}
+// `POST /v1/tools/emi/calculate` is still the mobile app's EMI engine
+// (EZ-Money/lib/emi.ts). The web computes EMI in app/lib/calculators.ts
+// instead, so it carries no client for that route; both are pinned to the
+// same fixture so the two platforms cannot drift.
 
 export interface AppNotification {
     id: number;
@@ -653,6 +658,16 @@ export const DashboardAPI = {
         api.get<DashboardResponse>("/v1/dashboard", { params }),
 };
 
+export const RecurringCandidatesAPI = {
+    saveDecision: (data: {
+        candidate_key: string;
+        merchant?: string;
+        category?: string;
+        decision: "dismissed" | "snoozed" | "tracked";
+        snoozed_until?: string;
+    }) => api.post<RecurringCandidateDecision>("/v1/recurring-candidates/decision", data),
+};
+
 export const ReportsAPI = {
     transactionSummary: (params?: EntryListParams) =>
         api.get<TransactionReportResponse>("/v1/reports/transactions/summary", { params }),
@@ -681,10 +696,6 @@ export const SubscriptionsAPI = {
     createReminders: () => api.post<{ created: number }>("/v1/subscriptions/reminders"),
 };
 
-export const ToolsAPI = {
-    calculateEMI: (data: { principal_amount: number; annual_interest_rate_percent: number; tenure_months: number; currency: "INR" }) =>
-        api.post<EMICalculation>("/v1/tools/emi/calculate", data),
-};
 
 export const SplitAPI = {
     listFriends: (status: "active" | "all" = "active") => api.get<SplitFriend[]>("/v1/split/friends", { params: { status } }),

@@ -21,144 +21,37 @@ import {
 } from "lucide-react";
 import { formatMoney } from "@/app/lib/format";
 import { cn } from "@/app/lib/utils";
+import {
+  calculateEMI,
+  calculateSIP,
+  type EMICalculation,
+  type SIPCalculation,
+  type SIPInput,
+  PROJECTION_DISCLAIMER,
+  SIP_PRESETS,
+  type SIPPresetID,
+  validateEMIInput,
+  validateSIPInput,
+} from "@/app/lib/calculators";
 
 type ActiveCalculator = "sip" | "emi";
-type SIPPresetID = "mutual_fund" | "ppf" | "nps" | "rd" | "custom";
-
-type SIPPreset = {
-  id: SIPPresetID;
-  label: string;
-  monthlyInvestment: number;
-  expectedAnnualReturnPercent: number;
-  tenureYears: number;
-  annualStepUpPercent: number;
-  currentCorpus: number;
-};
-
-type SIPCalculation = SIPPreset & {
-  investedAmount: number;
-  estimatedReturns: number;
-  maturityValue: number;
-  breakdown: Array<{ year: number; yearlyInvestment: number; yearEndValue: number }>;
-};
-
-type EMICalculation = {
-  monthlyEMI: number;
-  totalPayment: number;
-  totalInterest: number;
-  schedule: Array<{
-    month: number;
-    principalAmount: number;
-    interestAmount: number;
-    closingBalance: number;
-  }>;
-};
-
-const sipPresets: SIPPreset[] = [
-  { id: "mutual_fund", label: "Mutual Funds", monthlyInvestment: 10000, expectedAnnualReturnPercent: 12, tenureYears: 10, annualStepUpPercent: 10, currentCorpus: 0 },
-  { id: "ppf", label: "PPF", monthlyInvestment: 12500, expectedAnnualReturnPercent: 7, tenureYears: 15, annualStepUpPercent: 0, currentCorpus: 0 },
-  { id: "nps", label: "NPS", monthlyInvestment: 10000, expectedAnnualReturnPercent: 10, tenureYears: 20, annualStepUpPercent: 5, currentCorpus: 0 },
-  { id: "rd", label: "RD", monthlyInvestment: 5000, expectedAnnualReturnPercent: 6.5, tenureYears: 5, annualStepUpPercent: 0, currentCorpus: 0 },
-  { id: "custom", label: "Custom", monthlyInvestment: 10000, expectedAnnualReturnPercent: 8, tenureYears: 10, annualStepUpPercent: 0, currentCorpus: 0 },
-];
-
-function roundMoney(value: number) {
-  return Math.round(value);
-}
-
-function calculateSIP(input: SIPPreset): SIPCalculation {
-  const monthlyRate = input.expectedAnnualReturnPercent / 12 / 100;
-  const tenureMonths = Math.round(input.tenureYears * 12);
-  let value = input.currentCorpus;
-  let monthlyInvestment = input.monthlyInvestment;
-  let investedAmount = input.currentCorpus;
-  const breakdown: SIPCalculation["breakdown"] = [];
-
-  for (let month = 1; month <= tenureMonths; month += 1) {
-    value = value * (1 + monthlyRate) + monthlyInvestment;
-    investedAmount += monthlyInvestment;
-
-    if (month % 12 === 0 || month === tenureMonths) {
-      breakdown.push({
-        year: Math.ceil(month / 12),
-        yearlyInvestment: monthlyInvestment * (month % 12 === 0 ? 12 : month % 12),
-        yearEndValue: value,
-      });
-      monthlyInvestment *= 1 + input.annualStepUpPercent / 100;
-    }
-  }
-
-  return {
-    ...input,
-    investedAmount,
-    estimatedReturns: value - investedAmount,
-    maturityValue: value,
-    breakdown,
-  };
-}
-
-function calculateEMI(principal: number, annualInterestRatePercent: number, tenureMonths: number): EMICalculation {
-  const monthlyRate = annualInterestRatePercent / 12 / 100;
-  const monthlyEMI = monthlyRate === 0
-    ? roundMoney(principal / tenureMonths)
-    : roundMoney(principal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths) / (Math.pow(1 + monthlyRate, tenureMonths) - 1));
-
-  let balance = principal;
-  let totalPayment = 0;
-  let totalInterest = 0;
-  const schedule: EMICalculation["schedule"] = [];
-
-  for (let month = 1; month <= tenureMonths; month += 1) {
-    const interestAmount = roundMoney(balance * monthlyRate);
-    let principalAmount = monthlyEMI - interestAmount;
-    if (principalAmount <= 0 || principalAmount > balance || month === tenureMonths) {
-      principalAmount = balance;
-    }
-    const paymentAmount = principalAmount + interestAmount;
-    balance = Math.max(0, balance - principalAmount);
-    totalPayment += paymentAmount;
-    totalInterest += interestAmount;
-    schedule.push({ month, principalAmount, interestAmount, closingBalance: balance });
-    if (balance === 0) break;
-  }
-
-  return { monthlyEMI, totalPayment, totalInterest, schedule };
-}
-
-function validateSIP(input: SIPPreset) {
-  const errors: string[] = [];
-  if (!Number.isFinite(input.monthlyInvestment) || input.monthlyInvestment <= 0) errors.push("Monthly investment must be positive.");
-  if (!Number.isFinite(input.expectedAnnualReturnPercent) || input.expectedAnnualReturnPercent < 0 || input.expectedAnnualReturnPercent > 100) errors.push("Expected return must be between 0 and 100.");
-  if (!Number.isFinite(input.tenureYears) || input.tenureYears <= 0 || input.tenureYears > 60) errors.push("Tenure must be between 1 month and 60 years.");
-  if (!Number.isFinite(input.annualStepUpPercent) || input.annualStepUpPercent < 0 || input.annualStepUpPercent > 100) errors.push("Annual step-up must be between 0 and 100.");
-  if (!Number.isFinite(input.currentCorpus) || input.currentCorpus < 0) errors.push("Current corpus cannot be negative.");
-  return errors;
-}
-
-function validateEMI(principal: number, rate: number, months: number) {
-  const errors: string[] = [];
-  if (!Number.isFinite(principal) || principal <= 0) errors.push("Loan amount must be positive.");
-  if (!Number.isFinite(rate) || rate < 0 || rate > 100) errors.push("Interest rate must be between 0 and 100.");
-  if (!Number.isInteger(months) || months < 1 || months > 360) errors.push("Tenure must be between 1 and 360 months.");
-  return errors;
-}
 
 export default function PublicToolsClient() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCalculator, setActiveCalculator] = useState<ActiveCalculator>("sip");
   const [activeSIPPresetID, setActiveSIPPresetID] = useState<SIPPresetID>("mutual_fund");
-  const [sipInput, setSipInput] = useState<SIPPreset>(sipPresets[0]);
-  const [sipResult, setSipResult] = useState<SIPCalculation | null>(() => calculateSIP(sipPresets[0]));
+  const [sipInput, setSipInput] = useState<SIPInput>(SIP_PRESETS[0]);
+  const [sipResult, setSipResult] = useState<SIPCalculation | null>(() => calculateSIP(SIP_PRESETS[0]));
   const [sipError, setSipError] = useState("");
   const [showSIPBreakdown, setShowSIPBreakdown] = useState(false);
   const [principal, setPrincipal] = useState(1000000);
   const [rate, setRate] = useState(9);
   const [months, setMonths] = useState(60);
-  const [emiResult, setEmiResult] = useState<EMICalculation | null>(() => calculateEMI(1000000, 9, 60));
+  const [emiResult, setEmiResult] = useState<EMICalculation | null>(() => calculateEMI({ principalAmount: 1000000, annualInterestRatePercent: 9, tenureMonths: 60 }));
   const [emiError, setEmiError] = useState("");
   const [showEMISchedule, setShowEMISchedule] = useState(false);
 
-  const applySIPPreset = (preset: SIPPreset) => {
+  const applySIPPreset = (preset: SIPInput) => {
     setActiveSIPPresetID(preset.id);
     setSipInput(preset);
     setSipResult(calculateSIP(preset));
@@ -166,14 +59,14 @@ export default function PublicToolsClient() {
     setShowSIPBreakdown(false);
   };
 
-  const updateSIPInput = (patch: Partial<SIPPreset>) => {
+  const updateSIPInput = (patch: Partial<SIPInput>) => {
     setSipInput((current) => ({ ...current, ...patch, id: "custom", label: "Custom" }));
     setActiveSIPPresetID("custom");
   };
 
   const submitSIP = (event: FormEvent) => {
     event.preventDefault();
-    const errors = validateSIP(sipInput);
+    const errors = validateSIPInput(sipInput);
     if (errors.length) {
       setSipError(errors.join(" "));
       return;
@@ -186,14 +79,15 @@ export default function PublicToolsClient() {
   const submitEMI = (event: FormEvent) => {
     event.preventDefault();
     const roundedMonths = Math.round(months);
-    const errors = validateEMI(principal, rate, roundedMonths);
+    const input = { principalAmount: principal, annualInterestRatePercent: rate, tenureMonths: roundedMonths };
+    const errors = validateEMIInput(input);
     if (errors.length) {
       setEmiError(errors.join(" "));
       return;
     }
     setMonths(roundedMonths);
     setEmiError("");
-    setEmiResult(calculateEMI(principal, rate, roundedMonths));
+    setEmiResult(calculateEMI(input));
     setShowEMISchedule(false);
   };
 
@@ -290,7 +184,7 @@ export default function PublicToolsClient() {
                     <h2 className="mt-1 text-xl font-bold font-rounded">Investment projection</h2>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {sipPresets.map((preset) => (
+                    {SIP_PRESETS.map((preset) => (
                       <button key={preset.id} type="button" onClick={() => applySIPPreset(preset)} className={cn("rounded-full border px-3 py-2 text-xs font-bold", activeSIPPresetID === preset.id ? "border-accent bg-accent text-white" : "border-border bg-zinc-50 text-zinc-500 dark:bg-zinc-800")}>
                         {preset.label}
                       </button>
@@ -444,7 +338,7 @@ export default function PublicToolsClient() {
             {[
               { q: "Is the EMI calculator free?", a: "Yes. The EMI calculator on this page is free and does not require login." },
               { q: "Is the SIP calculator free?", a: "Yes. You can estimate SIP maturity value, invested amount, returns, and yearly growth without an account." },
-              { q: "Are the calculations financial advice?", a: "No. These are informational estimates based on the inputs you provide." },
+              { q: "Are the calculations financial advice?", a: PROJECTION_DISCLAIMER },
             ].map((faq) => (
               <details key={faq.q} className="rounded-2xl border border-border bg-white p-6 dark:bg-zinc-900">
                 <summary className="cursor-pointer text-lg font-bold">{faq.q}</summary>

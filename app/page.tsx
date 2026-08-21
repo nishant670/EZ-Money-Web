@@ -1,8 +1,6 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import type { Metadata } from "next";
 import {
   Mic,
   Brain,
@@ -15,73 +13,44 @@ import {
   CreditCard,
   TrendingUp,
   Smartphone,
-  Menu,
-  X,
   ArrowDownRight
 } from "lucide-react";
+import MarketingNav from "@/app/components/marketing/MarketingNav";
+import { SITE_URL } from "@/app/lib/site";
+
+export const metadata: Metadata = {
+  title: "Finnri | Confirm-first money tracking for India",
+  description: "Record expenses and income, review AI-suggested details, understand confirmed spending, and use free EMI and SIP calculators.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Finnri | Money clarity from records you confirm",
+    description: "Track day-to-day money and understand confirmed spending with Finnri.",
+    url: SITE_URL,
+    siteName: "Finnri",
+    type: "website",
+  },
+};
 
 export default function Home() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const next = window.scrollY > 20;
-      setScrolled((current) => current === next ? current : next);
-    };
-    handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Finnri",
+    // Structured data is not passed through `metadataBase`, so this URL has to
+    // be absolute here or it ships to crawlers as the literal string "/".
+    url: SITE_URL,
+    description: "Confirm-first money tracking and financial planning tools for India.",
+    potentialAction: {
+      "@type": "UseAction",
+      target: `${SITE_URL}/tools`,
+      name: "Use Finnri's free EMI and SIP calculators",
+    },
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      {/* Navigation */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-morphism py-3 shadow-sm" : "bg-transparent py-5"}`}>
-        <div className="container mx-auto px-6 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative flex h-11 w-28 items-center justify-center overflow-hidden rounded-xl bg-zinc-950 shadow-lg shadow-zinc-950/15">
-              <Image src="/finnri-logo.png" alt="Finnri" fill sizes="112px" className="scale-[2.35] object-contain" priority />
-            </div>
-          </Link>
-
-          {/* Desktop Nav */}
-          <div className="hidden lg:flex items-center gap-8">
-            <Link href="#features" className="text-sm font-medium hover:text-accent transition-colors">Features</Link>
-            <Link href="#how-it-works" className="text-sm font-medium hover:text-accent transition-colors">How it works</Link>
-            <Link href="#security" className="text-sm font-medium hover:text-accent transition-colors">Security</Link>
-            <Link href="#availability" className="text-sm font-medium hover:text-accent transition-colors">Availability</Link>
-            <Link href="/tools" className="text-sm font-medium hover:text-accent transition-colors">Free Tools</Link>
-            <Link href="/login" className="text-sm font-semibold text-accent hover:opacity-80 transition-opacity">Web Dashboard</Link>
-            <Link href="/login" className="bg-accent text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-accent/30 hover:scale-105 active:scale-95 transition-all">
-              Open Finnri
-            </Link>
-          </div>
-
-          {/* Mobile Menu Toggle */}
-          <button className="lg:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X /> : <Menu />}
-          </button>
-        </div>
-
-        {/* Mobile Nav Overlay */}
-        {isMenuOpen && (
-          <div className="lg:hidden absolute top-full left-0 right-0 bg-white dark:bg-zinc-900 border-b border-border shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="flex flex-col p-6 gap-4">
-              <Link href="#features" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Features</Link>
-              <Link href="#how-it-works" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">How it works</Link>
-              <Link href="#security" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Security</Link>
-              <Link href="#availability" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Availability</Link>
-              <Link href="/tools" className="text-lg font-medium">Free Tools</Link>
-              <div className="h-px bg-border my-2" />
-              <Link href="/login" className="text-lg font-bold text-accent">Web Dashboard Login</Link>
-              <Link href="/login" onClick={() => setIsMenuOpen(false)} className="bg-accent text-white px-6 py-4 rounded-2xl text-center font-bold shadow-lg">
-                Open Finnri
-              </Link>
-            </div>
-          </div>
-        )}
-      </nav>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }} />
+      <MarketingNav />
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">

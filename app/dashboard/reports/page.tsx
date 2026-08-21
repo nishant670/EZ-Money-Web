@@ -20,7 +20,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { TransactionFilterPanel, useTransactionFilters } from "@/app/components/dashboard/TransactionFilters";
 import { Account, AccountsAPI, apiErrorMessage, ReportsAPI, TransactionReportResponse } from "@/app/lib/api";
 import { formatMoney } from "@/app/lib/format";
-import { downloadTransactionsCSV } from "@/app/lib/export-transactions";
+import { downloadReportRollupsCSV } from "@/app/lib/export-report";
 import { transactionHref } from "@/app/lib/transaction-links";
 import { cn } from "@/app/lib/utils";
 import { PageSkeleton } from "@/app/components/ui/Skeleton";
@@ -80,14 +80,16 @@ export default function ReportsScreen() {
         income: item.income,
         net: item.net_cashflow,
     })) || [], [report]);
+    const byType = useMemo(() => new Map(report?.by_type.map((item) => [item.type, item]) || []), [report]);
     const hasData = Boolean(report?.summary.transaction_count);
     const drilldownHref = (overrides: Parameters<typeof transactionHref>[0]) => transactionHref({ ...entryParams(), ...overrides });
     const exportReportRows = async () => {
+        if (!report) return;
         setExportError("");
         setIsExporting(true);
         try {
-            await downloadTransactionsCSV(entryParams());
-            toast({ title: `${report?.summary.transaction_count || 0} report row${report?.summary.transaction_count === 1 ? "" : "s"} exported` });
+            downloadReportRollupsCSV(report);
+            toast({ title: `${report.summary.transaction_count.toLocaleString("en-IN")} filtered record${report.summary.transaction_count === 1 ? "" : "s"} summarized`, description: "Category, merchant, account, month, type, and headline rollups exported." });
         } catch (requestError) {
             setExportError(apiErrorMessage(requestError, "We couldn’t export these report rows."));
         } finally {
@@ -104,7 +106,7 @@ export default function ReportsScreen() {
                         <h1 className="mt-2 text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Transaction reports</h1>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Your user-filtered analysis and export workspace for category, merchant, account, month, and type totals.</p>
                     </div>
-                    <div className="flex gap-2"><button onClick={() => void exportReportRows()} disabled={isExporting || Boolean(amountError || dateError)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-bold text-zinc-600 disabled:opacity-40 dark:bg-zinc-900 dark:text-zinc-300"><Download className="h-4 w-4" />{isExporting ? "Exporting…" : "Export rows"}</button><button onClick={() => void loadReport()} className="inline-flex min-h-11 items-center gap-2 self-start rounded-xl border border-border bg-white px-4 text-sm font-bold text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> Refresh</button></div>
+                    <div className="flex flex-wrap gap-2"><button onClick={() => void exportReportRows()} disabled={!report || isExporting || Boolean(amountError || dateError)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-bold text-zinc-600 disabled:opacity-40 dark:bg-zinc-900 dark:text-zinc-300"><Download className="h-4 w-4" />{isExporting ? "Exporting…" : `Export ${(report?.summary.transaction_count || 0).toLocaleString("en-IN")} filtered record${report?.summary.transaction_count === 1 ? "" : "s"}`}</button><button onClick={() => void loadReport()} className="inline-flex min-h-11 items-center gap-2 self-start rounded-xl border border-border bg-white px-4 text-sm font-bold text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> Refresh</button></div>
                 </header>
 
                 <TransactionFilterPanel controller={filterController} accounts={accounts} searchLabel="Search reports" />
@@ -119,8 +121,8 @@ export default function ReportsScreen() {
                     <>
                         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                             {[
-                                { label: "Expense", value: formatMoney(report.summary.total_expense), detail: `${report.summary.expense_count} expense records`, icon: ArrowDownRight, tone: "text-rose-600 bg-rose-50 dark:bg-rose-950/30" },
-                                { label: "Income", value: formatMoney(report.summary.total_income), detail: `${report.summary.income_count} income records`, icon: ArrowUpRight, tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
+                                { label: "Expense", value: formatMoney(byType.get("expense")?.amount || 0), detail: `${byType.get("expense")?.transaction_count || 0} expense records`, icon: ArrowDownRight, tone: "text-rose-600 bg-rose-50 dark:bg-rose-950/30" },
+                                { label: "Income", value: formatMoney(byType.get("income")?.amount || 0), detail: `${byType.get("income")?.transaction_count || 0} income records`, icon: ArrowUpRight, tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
                                 { label: "Net cash flow", value: formatMoney(report.summary.net_cashflow), detail: report.summary.net_cashflow >= 0 ? "Income above expense" : "Expense above income", icon: Landmark, tone: "text-accent bg-accent/10" },
                                 { label: "Records", value: report.summary.transaction_count.toLocaleString("en-IN"), detail: "Matching filters", icon: IndianRupee, tone: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30" },
                             ].map((card) => (

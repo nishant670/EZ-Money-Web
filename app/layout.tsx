@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SITE_URL } from "./lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Finnri | Financial insights and planning tools",
   description: "Understand your spending, review recurring patterns, and plan with FINNRI's explainable financial dashboard.",
 };
