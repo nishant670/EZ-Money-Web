@@ -222,7 +222,7 @@ export function TransactionFilterPanel({
     };
 
     return (
-        <section className="space-y-4 rounded-[2rem] border border-border bg-white p-4 dark:bg-zinc-900" aria-label="Transaction filters">
+        <section className="space-y-4 rounded-panel border border-border bg-white p-4 dark:bg-zinc-900" aria-label="Transaction filters">
             <div className="grid gap-3 xl:grid-cols-4">
                 <label className="relative xl:col-span-2">
                     <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />

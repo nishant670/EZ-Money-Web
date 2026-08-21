@@ -262,7 +262,7 @@ export default function PublicToolsClient() {
             </div>
           </div>
 
-          <section id="calculators" className="rounded-[2rem] border border-border bg-background p-4 shadow-2xl shadow-zinc-950/10 sm:p-5">
+          <section id="calculators" className="rounded-panel border border-border bg-background p-4 shadow-2xl shadow-zinc-950/10 sm:p-5">
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-1 dark:bg-zinc-900">
               {[
                 { id: "sip" as const, label: "SIP Calculator", icon: ChartLine },
@@ -284,7 +284,7 @@ export default function PublicToolsClient() {
 
             {activeCalculator === "sip" ? (
               <div className="mt-5 grid gap-5 xl:grid-cols-[0.88fr_1.12fr]">
-                <form onSubmit={submitSIP} className="space-y-4 rounded-[1.5rem] border border-border bg-white p-5 dark:bg-zinc-900">
+                <form onSubmit={submitSIP} className="space-y-4 rounded-surface border border-border bg-white p-5 dark:bg-zinc-900">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">SIP details</p>
                     <h2 className="mt-1 text-xl font-bold font-rounded">Investment projection</h2>
@@ -336,7 +336,7 @@ export default function PublicToolsClient() {
               </div>
             ) : (
               <div className="mt-5 grid gap-5 xl:grid-cols-[0.88fr_1.12fr]">
-                <form onSubmit={submitEMI} className="space-y-4 rounded-[1.5rem] border border-border bg-white p-5 dark:bg-zinc-900">
+                <form onSubmit={submitEMI} className="space-y-4 rounded-surface border border-border bg-white p-5 dark:bg-zinc-900">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">EMI details</p>
                     <h2 className="mt-1 text-xl font-bold font-rounded">Loan repayment estimate</h2>
@@ -518,7 +518,7 @@ function ResultPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-border bg-white p-5 dark:bg-zinc-900 sm:p-6">
+    <div className="rounded-surface border border-border bg-white p-5 dark:bg-zinc-900 sm:p-6">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">{title}</p>
       <p className={cn("mt-3 text-4xl font-bold font-rounded sm:text-5xl", empty && "text-zinc-400")}>{primary}</p>
       {metrics.length > 0 && (

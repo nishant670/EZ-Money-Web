@@ -454,7 +454,7 @@ export default function AddTransactionModal({ isOpen, onClose, transaction = nul
                                             value={text}
                                             onChange={(e) => updateSourceText(e.target.value)}
                                             placeholder="Paste transaction text here... e.g. 'Paid 250 lunch UPI'"
-                                            className="w-full h-48 bg-zinc-50 dark:bg-zinc-800 border-none rounded-[2rem] p-8 text-xl font-medium outline-none focus:ring-4 focus:ring-accent/10 transition-all resize-none placeholder:text-zinc-300"
+                                            className="w-full h-48 bg-zinc-50 dark:bg-zinc-800 border-none rounded-panel p-8 text-xl font-medium outline-none focus:ring-4 focus:ring-accent/10 transition-all resize-none placeholder:text-zinc-300"
                                         />
                                         <div className="absolute top-6 left-8 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-accent bg-accent/10 px-2 py-0.5 rounded-full pointer-events-none">
                                             <Zap className="w-3 h-3" /> AI Engine Ready

@@ -6,6 +6,26 @@ import { cn } from "@/app/lib/utils";
 
 const FOCUSABLE = "a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex='-1'])";
 
+// Nested dialogs share one body-scroll lock. Saving and restoring the overflow
+// per instance leaves it stuck when a dialog and the confirmation it opened
+// unmount in the same commit: the outer restores "", then the inner restores
+// the "hidden" it captured. Only the outermost lock touches the body.
+let lockDepth = 0;
+let overflowBeforeLock = "";
+
+function lockBodyScroll() {
+    if (lockDepth === 0) {
+        overflowBeforeLock = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+    }
+    lockDepth += 1;
+}
+
+function unlockBodyScroll() {
+    lockDepth = Math.max(0, lockDepth - 1);
+    if (lockDepth === 0) document.body.style.overflow = overflowBeforeLock;
+}
+
 export default function Dialog({ open, onClose, labelledBy, children, className, panelClassName }: {
     open: boolean;
     onClose: () => void;
@@ -20,8 +40,7 @@ export default function Dialog({ open, onClose, labelledBy, children, className,
     useEffect(() => {
         if (!open) return;
         triggerRef.current = document.activeElement as HTMLElement | null;
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
+        lockBodyScroll();
         const panel = panelRef.current;
         const focusables = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) || []).filter((element) => !element.hasAttribute("hidden"));
         window.requestAnimationFrame(() => (focusables()[0] || panel)?.focus());
@@ -41,7 +60,7 @@ export default function Dialog({ open, onClose, labelledBy, children, className,
         document.addEventListener("keydown", onKeyDown);
         return () => {
             document.removeEventListener("keydown", onKeyDown);
-            document.body.style.overflow = previousOverflow;
+            unlockBodyScroll();
             triggerRef.current?.focus?.();
         };
     }, [onClose, open]);
@@ -50,7 +69,7 @@ export default function Dialog({ open, onClose, labelledBy, children, className,
     return createPortal(
         <div className={cn("fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6", className)}>
             <button type="button" aria-label="Close dialog" tabIndex={-1} onClick={onClose} className="absolute inset-0 cursor-default bg-zinc-950/45 backdrop-blur-sm" />
-            <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} className={cn("relative w-full overflow-y-auto rounded-[2rem] border border-border bg-card shadow-2xl outline-none", panelClassName)}>
+            <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} className={cn("relative w-full overflow-y-auto rounded-panel border border-border bg-card shadow-2xl outline-none", panelClassName)}>
                 {children}
             </div>
         </div>,

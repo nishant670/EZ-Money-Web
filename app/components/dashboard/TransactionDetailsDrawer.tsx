@@ -123,7 +123,7 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
                         <div className="flex-1 overflow-y-auto p-8 space-y-10">
                             {/* Hero Detail */}
                             <div className="text-center space-y-4">
-                                <div className="w-20 h-20 bg-accent/10 rounded-[2rem] flex items-center justify-center text-accent mx-auto shadow-sm">
+                                <div className="w-20 h-20 bg-accent/10 rounded-panel flex items-center justify-center text-accent mx-auto shadow-sm">
                                     {transaction.merchant ? transaction.merchant[0] : (transaction.title?.[0] || <Wallet className="w-8 h-8" />)}
                                 </div>
                                 <div>

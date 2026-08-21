@@ -41,7 +41,7 @@ function rangeFor(preset: "month" | "30d" | "90d") {
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
     return (
-        <div className="rounded-[2rem] border border-dashed border-accent/30 bg-gradient-to-br from-white to-accent/5 p-10 text-center dark:from-zinc-900 dark:to-accent/5">
+        <div className="rounded-panel border border-dashed border-accent/30 bg-gradient-to-br from-white to-accent/5 p-10 text-center dark:from-zinc-900 dark:to-accent/5">
             <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent/10 text-accent"><Sparkles className="h-6 w-6" /></span>
             <h2 className="mt-5 text-xl font-bold font-rounded">Your first insight starts with one transaction</h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">Add an expense or income. Finnri will turn it into category, account, merchant, and period-level insight automatically.</p>
@@ -140,7 +140,7 @@ export default function DashboardHome() {
                 {loading && !dashboard ? (
                     <PageSkeleton />
                 ) : error && !dashboard ? (
-                    <div className="rounded-[2rem] border border-red-200 bg-red-50 p-8 dark:border-red-900/40 dark:bg-red-950/20"><CircleAlert className="h-6 w-6 text-red-500" /><h2 className="mt-4 text-lg font-bold">Dashboard unavailable</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-red-700/70 dark:text-red-300/70">{error}</p><button onClick={() => void loadDashboard()} className="mt-5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white">Try again</button></div>
+                    <div className="rounded-panel border border-red-200 bg-red-50 p-8 dark:border-red-900/40 dark:bg-red-950/20"><CircleAlert className="h-6 w-6 text-red-500" /><h2 className="mt-4 text-lg font-bold">Dashboard unavailable</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-red-700/70 dark:text-red-300/70">{error}</p><button onClick={() => void loadDashboard()} className="mt-5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white">Try again</button></div>
                 ) : !hasData ? <EmptyState onAdd={() => setIsModalOpen(true)} /> : dashboard && (
                     <>
                         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -149,7 +149,7 @@ export default function DashboardHome() {
                                 { label: "Income", value: formatMoney(dashboard.summary.total_income), detail: "Confirmed income", icon: TrendingUp, tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
                                 { label: "Net cash flow", value: formatMoney(net), detail: net >= 0 ? "Positive for this period" : "Spending is above income", icon: WalletCards, tone: "text-accent bg-accent/10" },
                                 { label: "Daily average", value: formatMoney(dashboard.summary.daily_average), detail: "Expense pace", icon: IndianRupee, tone: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30" },
-                            ].map((card) => <article key={card.label} className="rounded-[2rem] border border-border bg-white p-6 shadow-sm dark:bg-zinc-900"><div className={cn("grid h-11 w-11 place-items-center rounded-2xl", card.tone)}><card.icon className="h-5 w-5" /></div><p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">{card.label}</p><p className="mt-2 text-2xl font-bold tracking-tight font-rounded">{card.value}</p><p className="mt-1 text-xs text-zinc-500">{card.detail}</p></article>)}
+                            ].map((card) => <article key={card.label} className="rounded-panel border border-border bg-white p-6 shadow-sm dark:bg-zinc-900"><div className={cn("grid h-11 w-11 place-items-center rounded-2xl", card.tone)}><card.icon className="h-5 w-5" /></div><p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">{card.label}</p><p className="mt-2 text-2xl font-bold tracking-tight font-rounded">{card.value}</p><p className="mt-1 text-xs text-zinc-500">{card.detail}</p></article>)}
                         </section>
 
                         {topInsight && (
@@ -160,7 +160,7 @@ export default function DashboardHome() {
                         )}
 
                         {dashboard.review_items.length > 0 && (
-                            <section id="review-queue" className="rounded-[2rem] border border-amber-200 bg-amber-50/60 p-6 dark:border-amber-900/50 dark:bg-amber-950/20 sm:p-8" aria-labelledby="review-queue-heading">
+                            <section id="review-queue" className="rounded-panel border border-amber-200 bg-amber-50/60 p-6 dark:border-amber-900/50 dark:bg-amber-950/20 sm:p-8" aria-labelledby="review-queue-heading">
                                 <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Needs correction</p><h2 id="review-queue-heading" className="mt-2 text-xl font-bold font-rounded">Review {dashboard.review_items.length} transaction{dashboard.review_items.length === 1 ? "" : "s"}</h2><p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">These records are missing a category or linked account. Open one to correct it; it leaves this queue after the required field is saved.</p></div>
                                 <div className="mt-5 grid gap-3 lg:grid-cols-2">{dashboard.review_items.map((item) => (
                                     <button key={item.id} onClick={() => setSelectedTransaction(item)} className="flex items-center gap-4 rounded-2xl border border-amber-200 bg-white p-4 text-left hover:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-200/50 dark:border-amber-900/50 dark:bg-zinc-900">
@@ -173,7 +173,7 @@ export default function DashboardHome() {
                         )}
 
                         {dashboard.budget_statuses.length > 0 && (
-                            <section aria-labelledby="budget-progress-heading" className="rounded-[2rem] border border-border bg-zinc-100/70 p-6 dark:bg-zinc-950 sm:p-8">
+                            <section aria-labelledby="budget-progress-heading" className="rounded-panel border border-border bg-zinc-100/70 p-6 dark:bg-zinc-950 sm:p-8">
                                 <div className="flex items-end justify-between gap-4">
                                     <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">Monthly guardrails</p><h2 id="budget-progress-heading" className="mt-2 text-xl font-bold font-rounded">Budget progress</h2></div>
                                     <Link href="/dashboard/tools#budgets" className="inline-flex items-center gap-1 text-xs font-bold text-accent">Manage budgets <ArrowUpRight className="h-4 w-4" /></Link>
@@ -182,7 +182,7 @@ export default function DashboardHome() {
                             </section>
                         )}
 
-                        <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
+                        <section className="rounded-panel border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                                 <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">Daily pace</p><h2 className="mt-2 text-xl font-bold font-rounded">Spending trend</h2></div>
                                 <p className="text-xs font-semibold text-zinc-400">{dailyTransactionCount} purchase{dailyTransactionCount === 1 ? "" : "s"} across {spendingDayCount} spending day{spendingDayCount === 1 ? "" : "s"}</p>
@@ -219,7 +219,7 @@ export default function DashboardHome() {
                             <p className="mt-3 text-xs text-zinc-400">Hover for detail, or select a bar/day to inspect the purchases.</p>
                         </section>
 
-                        <section className="rounded-[2rem] border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
+                        <section className="rounded-panel border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
                             <div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">Latest activity</p><h2 className="mt-2 text-xl font-bold font-rounded">Recent transactions</h2></div><Link href="/dashboard/transactions" className="inline-flex items-center gap-1 text-xs font-bold text-accent">View all <ArrowUpRight className="h-4 w-4" /></Link></div>
                             <div className="mt-6 divide-y divide-border">{dashboard.recent_transactions.length ? dashboard.recent_transactions.map((transaction) => <button key={transaction.id} onClick={() => setSelectedTransaction(transaction)} className="flex min-h-16 w-full items-center gap-4 py-3 text-left"><span className="grid h-10 w-10 place-items-center rounded-xl bg-zinc-100 text-sm font-bold text-zinc-500 dark:bg-zinc-800">{(transaction.merchant || transaction.title || "?").slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{transaction.merchant || transaction.title}</p><p className="truncate text-xs text-zinc-400">{transaction.category} · {transaction.account?.name || transaction.mode}</p></div><div className="text-right"><p className={cn("text-sm font-bold", transaction.type === "income" ? "text-emerald-600" : "text-zinc-900 dark:text-white")}>{transaction.type === "income" ? "+" : "−"}{formatMoney(transaction.amount)}</p><p className="text-xs text-zinc-400">{formatDate(transaction.date)}</p></div></button>) : <div className="rounded-2xl bg-zinc-50 px-5 py-8 text-center dark:bg-zinc-800/60"><p className="text-sm font-semibold text-zinc-500">No recent transactions in this period.</p><p className="mt-1 text-xs text-zinc-400">Older matching records are still available from View all.</p></div>}</div>
                         </section>

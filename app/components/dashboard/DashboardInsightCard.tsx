@@ -45,7 +45,7 @@ export default function DashboardInsightCard({
 
     return (
         <article className={cn(
-            "rounded-[2rem] border bg-white p-6 dark:bg-zinc-900",
+            "rounded-panel border bg-white p-6 dark:bg-zinc-900",
             warning ? "border-amber-200 dark:border-amber-900/50" : "border-border",
             featured && "bg-gradient-to-r from-accent/10 via-white to-white dark:via-zinc-900 dark:to-zinc-900 sm:p-8",
         )}>
