@@ -13,6 +13,8 @@
   --chart-axis: #52525B;
   --chart-tooltip: #FFFFFF;
   --chart-positive: #15803D;
+  --glass-background: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
   /* The two large radii of the product. Named off Tailwind's own scale so they
      add utilities instead of redefining rounded-xl/2xl for every small control. */
   --panel-radius: 2rem;
@@ -29,8 +31,8 @@
   --color-text-muted: var(--text-muted);
   --radius-panel: var(--panel-radius);
   --radius-surface: var(--surface-radius);
-  --font-sans: 'Avenir Next', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-rounded: 'Avenir Next', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-rounded: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", ui-sans-serif, system-ui, sans-serif;
 }
 
 .dark {
@@ -45,6 +47,8 @@
     --chart-axis: #D4D4D8;
     --chart-tooltip: #242424;
     --chart-positive: #4ADE80;
+    --glass-background: rgba(26, 26, 26, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 body {
@@ -60,15 +64,10 @@ body {
 }
 
 .glass-morphism {
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--glass-background);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.dark .glass-morphism {
-  background: rgba(26, 26, 26, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
 }
 
 @keyframes float {

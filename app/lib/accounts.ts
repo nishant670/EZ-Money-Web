@@ -45,3 +45,10 @@ export function resolvePaymentMode(value: string | null | undefined): PaymentMod
     const normalized = value?.trim().toLowerCase();
     return PAYMENT_MODES.find((mode) => mode.toLowerCase() === normalized) || null;
 }
+
+export function creditCardPosition(outstanding: number | null | undefined) {
+    const amount = Number.isFinite(outstanding) ? outstanding as number : 0;
+    return amount < 0
+        ? { label: "In credit", displayAmount: Math.abs(amount), owedAmount: 0 }
+        : { label: "Outstanding", displayAmount: amount, owedAmount: amount };
+}

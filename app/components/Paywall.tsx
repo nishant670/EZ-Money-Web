@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Clock3, Sparkles } from "lucide-react";
 import { EntitlementError } from "@/app/lib/api";
 import { formatTime } from "@/app/lib/format";
+import { planDisplayName } from "@/app/lib/plans";
 import { useAuth } from "@/app/context/AuthContext";
 
 interface PaywallProps {
@@ -34,7 +35,7 @@ export default function Paywall({ error, featureLabel, compact = false }: Paywal
             <p className="mt-1 text-sm leading-6 opacity-75">
                 {allowancePaused
                     ? resetTime ? `AI is back at ${resetTime}. You can keep entering transactions manually until then.` : "Your daily allowance will reset soon. You can keep working manually until then."
-                    : error.requiredPlan ? `${feature} is included with ${error.requiredPlan}.` : `${feature} needs an upgraded FINNRI account.`}
+                    : error.requiredPlan ? `${feature} is included with ${planDisplayName(error.requiredPlan)}.` : `${feature} needs an upgraded Finnri account.`}
             </p>
             {!allowancePaused && error.requiredCredits != null && (
                 <p className="mt-2 text-xs font-semibold opacity-70">

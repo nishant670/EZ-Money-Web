@@ -24,6 +24,13 @@ import { useAuth } from "@/app/context/AuthContext";
 
 type LoginStep = "choice" | "identifier" | "otp" | "pin";
 type AuthMode = "login" | "register" | "reset";
+const RESEND_COOLDOWN_MS = 30_000;
+
+function formatCountdown(totalSeconds: number) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
 
 declare global {
     interface Window {
@@ -61,6 +68,10 @@ export default function LoginPage() {
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const [otpNotice, setOtpNotice] = useState("");
+    const [otpExpiresAt, setOtpExpiresAt] = useState("");
+    const [resendAvailableAt, setResendAvailableAt] = useState(0);
+    const [otpClock, setOtpClock] = useState(() => Date.now());
     const googleNonce = useRef<string>("");
 
     useEffect(() => {
@@ -74,6 +85,12 @@ export default function LoginPage() {
             sessionStorage.removeItem("finnri_auth_notice");
         }
     }, []);
+
+    useEffect(() => {
+        if (step !== "otp") return;
+        const timer = window.setInterval(() => setOtpClock(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, [step]);
 
     useEffect(() => {
         if (step !== "choice" || !googleButtonRef.current) return;
@@ -172,8 +189,12 @@ export default function LoginPage() {
 
     const sendCode = async (value: string) => {
         const response = await AuthAPI.sendOTP(value);
+        const now = Date.now();
         setDevOTP(response.data.dev_otp || "");
         setOtp("");
+        setOtpExpiresAt(response.data.expires_at);
+        setResendAvailableAt(now + RESEND_COOLDOWN_MS);
+        setOtpClock(now);
     };
 
     const handleIdentify = async (event: FormEvent) => {
@@ -191,6 +212,7 @@ export default function LoginPage() {
                 setStep("pin");
             } else {
                 await sendCode(value);
+                setOtpNotice("Verification code sent.");
                 setAuthMode("register");
                 setStep("otp");
             }
@@ -250,6 +272,7 @@ export default function LoginPage() {
         setIsLoading(true); setError(null);
         try {
             await sendCode(identifier);
+            setOtpNotice("Verification code sent.");
             setAuthMode("reset");
             setStep("otp");
         } catch (requestError) {
@@ -257,16 +280,27 @@ export default function LoginPage() {
         } finally { setIsLoading(false); }
     };
 
+    const handleGuestLogin = async () => {
+        setIsLoading(true); setError(null);
+        try { await loginAsGuest(); }
+        catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t open a guest workspace.")); }
+        finally { setIsLoading(false); }
+    };
+
     const resendCode = async () => {
         setIsLoading(true); setError(null);
-        try { await sendCode(identifier); }
+        try { await sendCode(identifier); setOtpNotice("A new verification code was sent."); }
         catch (requestError) { setError(apiErrorMessage(requestError, "We couldn’t resend the code.")); }
         finally { setIsLoading(false); }
     };
 
     const chooseType = (type: "email" | "phone") => {
-        setLoginType(type); setIdentifier(""); setError(null); setStep("identifier");
+        setLoginType(type); setIdentifier(""); setError(null); setOtpNotice(""); setStep("identifier");
     };
+
+    const resendSeconds = Math.max(0, Math.ceil((resendAvailableAt - otpClock) / 1000));
+    const expiresAtTime = new Date(otpExpiresAt).getTime();
+    const expirySeconds = Number.isFinite(expiresAtTime) ? Math.max(0, Math.ceil((expiresAtTime - otpClock) / 1000)) : 0;
 
     if (authIsLoading || token) {
         return <main className="grid min-h-screen place-items-center bg-[#FDF5F7] text-sm font-semibold text-zinc-500 dark:bg-zinc-950">Opening your dashboard…</main>;
@@ -300,7 +334,7 @@ export default function LoginPage() {
                             <button onClick={() => chooseType("email")} className="group flex min-h-20 w-full items-center justify-between rounded-2xl border border-border bg-zinc-50 p-4 text-left transition hover:border-accent/30 hover:bg-white dark:bg-zinc-800/50 dark:hover:bg-zinc-800"><span className="flex items-center gap-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent/10 text-accent"><Mail className="h-5 w-5" /></span><span><span className="block font-bold">Continue with email</span><span className="mt-1 block text-xs text-zinc-400">PIN for returning users, OTP to register</span></span></span><ChevronRight className="h-5 w-5 text-zinc-300 transition group-hover:translate-x-1 group-hover:text-accent" /></button>
                             <button onClick={() => chooseType("phone")} className="group flex min-h-20 w-full items-center justify-between rounded-2xl border border-border bg-zinc-50 p-4 text-left transition hover:border-accent/30 hover:bg-white dark:bg-zinc-800/50 dark:hover:bg-zinc-800"><span className="flex items-center gap-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent/10 text-accent"><Phone className="h-5 w-5" /></span><span><span className="block font-bold">Continue with phone</span><span className="mt-1 block text-xs text-zinc-400">Use your number with country code</span></span></span><ChevronRight className="h-5 w-5 text-zinc-300 transition group-hover:translate-x-1 group-hover:text-accent" /></button>
                             <div className="relative py-3"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div><span className="relative mx-auto block w-fit bg-white px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-300 dark:bg-zinc-900">or</span></div>
-                            <button onClick={() => void loginAsGuest()} disabled={isLoading} className="flex min-h-20 w-full items-center justify-between rounded-2xl border border-dashed border-accent/30 bg-accent/5 p-4 text-left text-accent disabled:opacity-60"><span className="flex items-center gap-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-white">{isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserRound className="h-5 w-5" />}</span><span><span className="block font-bold">Continue as guest</span><span className="mt-1 block text-xs text-accent/70">A real private workspace—no sample data</span></span></span><ArrowRight className="h-4 w-4" /></button>
+                            <button onClick={() => void handleGuestLogin()} disabled={isLoading} className="flex min-h-20 w-full items-center justify-between rounded-2xl border border-dashed border-accent/30 bg-accent/5 p-4 text-left text-accent disabled:opacity-60"><span className="flex items-center gap-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-white">{isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserRound className="h-5 w-5" />}</span><span><span className="block font-bold">Continue as guest</span><span className="mt-1 block text-xs text-accent/70">A real private workspace—no sample data</span></span></span><ArrowRight className="h-4 w-4" /></button>
                         </div>}
 
                         {step === "identifier" && <form onSubmit={handleIdentify} className="space-y-5">
@@ -313,10 +347,11 @@ export default function LoginPage() {
                         {step === "otp" && <form onSubmit={handleVerifyOTP} className="space-y-5">
                             <button type="button" onClick={() => { setStep("identifier"); setError(null); }} className="inline-flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-accent"><ArrowLeft className="h-4 w-4" /> Change {loginType}</button>
                             <div><h1 className="text-2xl font-bold font-rounded">Verify your {loginType}</h1><p className="mt-2 text-sm leading-6 text-zinc-500">Enter the 6-digit code sent to <strong>{identifier}</strong>.</p></div>
+                            {otpNotice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200"><p className="font-bold">{otpNotice}</p><p className="mt-1 text-xs opacity-75">{expirySeconds > 0 ? `Code expires in ${formatCountdown(expirySeconds)}.` : "This code has expired. Request a new one."}</p></div>}
                             {devOTP && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200"><p className="text-[10px] font-bold uppercase tracking-[0.18em]">Local development code</p><div className="mt-2 flex items-center justify-between"><code className="text-xl font-bold tracking-[0.25em]">{devOTP}</code><button type="button" onClick={() => setOtp(devOTP)} className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-bold dark:bg-amber-900/40">Use code</button></div></div>}
                             <input required type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ""))} placeholder="000000" aria-label="Verification code" className="min-h-16 w-full rounded-2xl bg-zinc-100 px-4 text-center text-2xl font-bold tracking-[0.45em] outline-none focus:ring-4 focus:ring-accent/10 dark:bg-zinc-800" autoFocus />
                             <button disabled={isLoading} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-accent text-base font-bold text-white shadow-xl shadow-accent/20 disabled:opacity-60">{isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <>Verify code <CheckCircle2 className="h-4 w-4" /></>}</button>
-                            <button type="button" onClick={() => void resendCode()} disabled={isLoading} className="w-full text-center text-xs font-bold text-zinc-400 hover:text-accent disabled:opacity-50">Send a new code</button>
+                            <button type="button" onClick={() => void resendCode()} disabled={isLoading || resendSeconds > 0} className="w-full text-center text-xs font-bold text-zinc-400 hover:text-accent disabled:opacity-50">{resendSeconds > 0 ? `Send a new code in ${resendSeconds}s` : "Send a new code"}</button>
                         </form>}
 
                         {step === "pin" && <form onSubmit={handleFinalAuth} className="space-y-5">

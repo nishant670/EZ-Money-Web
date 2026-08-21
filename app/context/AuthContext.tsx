@@ -91,19 +91,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const loginAsGuest = async () => {
-        try {
-            const storedDeviceId = localStorage.getItem("finnri_web_device_id");
-            const deviceId = storedDeviceId || `web_${crypto.randomUUID()}`;
-            localStorage.setItem("finnri_web_device_id", deviceId);
-            const res = await AuthAPI.loginGuest(deviceId);
+        const storedDeviceId = localStorage.getItem("finnri_web_device_id");
+        const deviceId = storedDeviceId || `web_${crypto.randomUUID()}`;
+        localStorage.setItem("finnri_web_device_id", deviceId);
+        const res = await AuthAPI.loginGuest(deviceId);
 
-            const { token, user } = res.data;
-            login(token, user);
-            router.push("/dashboard");
-        } catch (error) {
-            console.error("Guest login failed", error);
-            throw error;
-        }
+        const { token, user } = res.data;
+        login(token, user);
+        router.push("/dashboard");
     };
 
     const claimGuest = async (claimToken: string, pin: string) => {

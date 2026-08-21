@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, CircleAlert, Download, Loader2, Plus } from "lucide-react";
 import AddTransactionModal from "@/app/components/dashboard/AddTransactionModal";
 import TransactionDetailsDrawer from "@/app/components/dashboard/TransactionDetailsDrawer";
@@ -23,6 +24,9 @@ function TransactionCard({ transaction, onOpen }: { transaction: Transaction; on
 
 export default function TransactionsScreen() {
     const { toast } = useToast();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const entryIDParam = searchParams.get("entry_id");
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
@@ -49,6 +53,20 @@ export default function TransactionsScreen() {
         finally { setLoading(false); setHasLoaded(true); }
     }, [amountError, dateError, entryParams]);
     useEffect(() => { const timer = window.setTimeout(() => void loadTransactions(), 250); return () => window.clearTimeout(timer); }, [loadTransactions]);
+    useEffect(() => {
+        if (!entryIDParam || !/^\d+$/.test(entryIDParam)) return;
+        let active = true;
+        EntriesAPI.get(Number(entryIDParam))
+            .then((response) => { if (active) setSelectedTransaction(response.data); })
+            .catch((requestError) => {
+                if (active) toast({
+                    title: "Transaction unavailable",
+                    description: apiErrorMessage(requestError, "This notification’s transaction could not be opened."),
+                });
+            });
+        return () => { active = false; };
+    }, [entryIDParam, toast]);
+
     const exportCurrentView = async () => {
         setExportError(""); setIsExporting(true);
         try { await downloadTransactionsCSV(entryParams(false)); toast({ title: `${total.toLocaleString("en-IN")} transaction${total === 1 ? "" : "s"} exported` }); }
@@ -56,6 +74,13 @@ export default function TransactionsScreen() {
         finally { setIsExporting(false); }
     };
     const closeModal = () => { setIsModalOpen(false); setEditing(null); };
+    const closeSelectedTransaction = () => {
+        setSelectedTransaction(null);
+        if (!entryIDParam) return;
+        const next = new URLSearchParams(searchParams.toString());
+        next.delete("entry_id");
+        router.replace(next.size ? `/dashboard/transactions?${next.toString()}` : "/dashboard/transactions");
+    };
     const handleSaved = async (saved: Transaction) => { setTransactions((current) => current.map((item) => item.id === saved.id ? saved : item)); await loadTransactions(); if (editing) setSelectedTransaction(saved); };
 
     return <>
@@ -73,6 +98,6 @@ export default function TransactionsScreen() {
             </section>
         </div>
         <AddTransactionModal isOpen={isModalOpen} onClose={closeModal} transaction={editing?.transaction} linkedSplitBill={editing?.splitBill} splitDataAvailable={editing?.splitDataAvailable} onSaved={handleSaved} />
-        <TransactionDetailsDrawer isOpen={Boolean(selectedTransaction) && !isModalOpen} transaction={selectedTransaction} onEdit={(transaction, splitBill, splitDataAvailable) => { setEditing({ transaction, splitBill, splitDataAvailable }); setIsModalOpen(true); }} onClose={() => setSelectedTransaction(null)} onChanged={() => { void loadTransactions(); }} />
+        <TransactionDetailsDrawer isOpen={Boolean(selectedTransaction) && !isModalOpen} transaction={selectedTransaction} onEdit={(transaction, splitBill, splitDataAvailable) => { setEditing({ transaction, splitBill, splitDataAvailable }); setIsModalOpen(true); }} onClose={closeSelectedTransaction} onChanged={() => { void loadTransactions(); }} />
     </>;
 }

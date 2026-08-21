@@ -1,4 +1,5 @@
 import { CategoriesAPI } from "@/app/lib/api";
+export { categoryOptionsFor } from "@/app/lib/category-options";
 
 /**
  * The category vocabulary, read from the API rather than declared here.
@@ -87,18 +88,4 @@ export async function loadCategories(): Promise<CategorySet> {
     });
 
   return inFlight;
-}
-
-/**
- * The picker list for a given value.
- *
- * An unrecognised category — one a user created deliberately, which the backend
- * stores verbatim — is appended so that editing that entry never silently
- * rewrites it. This mirrors `categoryOptionsFor` in `EZ-Money/lib/categories.ts`.
- */
-export function categoryOptionsFor(canonical: string[], current?: string | null): string[] {
-  const value = current?.trim();
-  if (!value) return canonical;
-  const alreadyListed = canonical.some((category) => category.toLowerCase() === value.toLowerCase());
-  return alreadyListed ? canonical : [...canonical, value];
 }

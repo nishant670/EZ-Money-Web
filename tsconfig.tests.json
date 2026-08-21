@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "rootDir": ".",
+    "outDir": ".test-build"
+  },
+  "include": [
+    "app/lib/accounts.ts",
+    "app/lib/accounts.test.ts",
+    "app/lib/calculators.ts",
+    "app/lib/calculators.test.ts",
+    "app/lib/category-options.ts",
+    "app/lib/category-options.test.ts",
+    "app/lib/format.ts",
+    "app/lib/format.test.ts",
+    "app/lib/notifications.ts",
+    "app/lib/notifications.test.ts",
+    "app/lib/plans.ts",
+    "app/lib/plans.test.ts"
+  ]
+}

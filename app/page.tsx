@@ -418,11 +418,11 @@ export default function Home() {
               { q: "How does voice input work?", a: "In the mobile app, tap the microphone and speak naturally. Finnri sends the audio for transcription, creates an editable draft, and waits for your confirmation before saving a transaction." },
               { q: "What happens to voice and text drafts?", a: "Voice audio is held only long enough to transcribe it. Parse attempts, raw provider prompts, and raw provider responses are not persisted. A confirmed transaction may retain its source text as editable provenance." },
               { q: "Can I export my data?", a: "Yes. CSV export of the current transaction view is available today. PDF export is not available on the web, and CSV is not advertised as a paid-only feature." }
-            ].map((faq, i) => (
-              <div key={i} className="border border-border rounded-2xl p-6 bg-white dark:bg-zinc-800">
-                <h3 className="text-lg font-bold mb-3">{faq.q}</h3>
-                <p className="text-text-muted leading-relaxed">{faq.a}</p>
-              </div>
+            ].map((faq) => (
+              <details key={faq.q} className="group border border-border rounded-2xl bg-white p-6 dark:bg-zinc-800">
+                <summary className="cursor-pointer text-lg font-bold">{faq.q}</summary>
+                <p className="mt-3 text-text-muted leading-relaxed">{faq.a}</p>
+              </details>
             ))}
           </div>
         </div>

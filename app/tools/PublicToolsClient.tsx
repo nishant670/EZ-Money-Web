@@ -10,9 +10,6 @@ import {
   ChartLine,
   CheckCircle2,
   ChevronDown,
-  FileText,
-  Grid2X2,
-  Home,
   IndianRupee,
   Menu,
   ShieldCheck,
@@ -300,31 +297,6 @@ export default function PublicToolsClient() {
                   <h3 className="mt-5 text-lg font-bold">{item.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-text-muted">{item.body}</p>
                 </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-zinc-950 py-20 text-white">
-        <div className="container mx-auto px-6">
-          <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-center">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">More tools</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight font-rounded">More public calculators are planned</h2>
-              <p className="mt-4 max-w-2xl text-zinc-400 leading-7">The web tools page is set up for public discovery. HRA, ITR, and additional planning tools can be added here as they become available.</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                { icon: Home, label: "HRA", caption: "Tax rent" },
-                { icon: FileText, label: "ITR", caption: "Tax filing" },
-                { icon: Grid2X2, label: "More", caption: "Planned" },
-              ].map((tool) => (
-                <div key={tool.label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <tool.icon className="h-5 w-5 text-accent" />
-                  <p className="mt-4 font-bold">{tool.label}</p>
-                  <p className="mt-1 text-xs text-zinc-400">{tool.caption}</p>
-                </div>
               ))}
             </div>
           </div>

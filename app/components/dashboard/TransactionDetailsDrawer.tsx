@@ -42,8 +42,8 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
     useEffect(() => {
         let active = true;
         if (!isOpen || !transaction) return;
-        SplitAPI.listBills().then((response) => {
-            if (active) setSplitResult({ entryID: transaction.id, bill: response.data.find((bill) => bill.entry_id === transaction.id) || null, available: true });
+        SplitAPI.getBillForEntry(transaction.id).then((response) => {
+            if (active) setSplitResult({ entryID: transaction.id, bill: response.data, available: true });
         }).catch(() => {
             if (active) setSplitResult({ entryID: transaction.id, bill: null, available: false });
         });
@@ -68,8 +68,13 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
             onClose();
         } catch (err) {
             setError(apiErrorMessage(err, "Failed to delete transaction."));
+        } finally {
+            // The drawer stays mounted after a successful delete or duplicate,
+            // so the flag has to clear on every path. Leaving it set on success
+            // disabled Edit, Duplicate and Delete on the next entry opened.
             setLoading(false);
-        } finally { setConfirmAction(null); }
+            setConfirmAction(null);
+        }
     };
 
     const handleDuplicate = async () => {
@@ -77,14 +82,15 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
         setError("");
         try {
             const response = await EntriesAPI.create({
-                title: `${transaction.merchant || transaction.title} (Copy)`,
+                title: transaction.title,
                 merchant: transaction.merchant,
                 amount: transaction.amount,
                 currency: "INR",
                 type: transaction.type,
                 source: "manual",
-                // Duplication is an exact copy, including the stored mode. New
-                // manual entries omit mode and let account_id carry the truth.
+                // Duplication preserves the stored record exactly, including
+                // title, merchant, and mode. New manual entries omit mode and
+                // let account_id carry the truth.
                 mode: transaction.mode,
                 category: transaction.category,
                 date: toLocalISO(),
@@ -98,8 +104,13 @@ export default function TransactionDetailsDrawer({ isOpen, onClose, onChanged, t
             onClose();
         } catch (err) {
             setError(apiErrorMessage(err, "Failed to duplicate transaction."));
+        } finally {
+            // The drawer stays mounted after a successful delete or duplicate,
+            // so the flag has to clear on every path. Leaving it set on success
+            // disabled Edit, Duplicate and Delete on the next entry opened.
             setLoading(false);
-        } finally { setConfirmAction(null); }
+            setConfirmAction(null);
+        }
     };
 
     return (

@@ -26,6 +26,7 @@ import { cn } from "@/app/lib/utils";
 import { useAuth } from "@/app/context/AuthContext";
 import { AppNotification, NotificationsAPI } from "@/app/lib/api";
 import { formatDate } from "@/app/lib/format";
+import { notificationDestination } from "@/app/lib/notifications";
 import GuestClaimModal from "@/app/components/dashboard/GuestClaimModal";
 
 const NAV_ITEMS = [
@@ -132,8 +133,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (!notification.read_at) await NotificationsAPI.markRead(notification.id);
         setIsNotificationsOpen(false);
         await loadNotifications();
-        if (notification.action_url?.startsWith("/entry/")) router.push("/dashboard/transactions");
-        if (notification.action_url === "/subscriptions") router.push("/dashboard/tools#subscriptions");
+        const destination = notificationDestination(notification.action_url);
+        if (destination) router.push(destination);
     };
 
     if (isLoading || !token) {

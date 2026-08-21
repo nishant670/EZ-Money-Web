@@ -637,6 +637,7 @@ export const AuthAPI = {
 
 export const EntriesAPI = {
     list: (params?: EntryListParams) => api.get<EntryListResponse>("/v1/entries", { params }),
+    get: (id: number) => api.get<Transaction>(`/v1/entries/${id}`),
     exportCSV: (params?: EntryListParams) => api.get<Blob>("/v1/entries/export", {
         params: { ...params, format: "csv" },
         responseType: "blob",
@@ -707,6 +708,7 @@ export const SplitAPI = {
     updateGroup: (id: number, data: SplitGroupInput) => api.put<SplitGroup>(`/v1/split/groups/${id}`, data),
     archiveGroup: (id: number) => api.delete(`/v1/split/groups/${id}`),
     listBills: () => api.get<SplitBill[]>("/v1/split/bills"),
+    getBillForEntry: (entryID: number) => api.get<SplitBill | null>(`/v1/split/bills/by-entry/${entryID}`),
     createBill: (data: SplitBillInput) => api.post<SplitBill>("/v1/split/bills", data),
     updateBill: (id: number, data: SplitBillInput) => api.put<SplitBill>(`/v1/split/bills/${id}`, data),
     deleteBill: (id: number) => api.delete(`/v1/split/bills/${id}`),
