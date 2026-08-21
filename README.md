@@ -20,7 +20,7 @@ web origin through the backend CORS configuration.
 
 - Authentication: guest, identify, OTP, registration, and PIN login.
 - Overview and insights: `GET /v1/dashboard` with date ranges and timezone.
-- Transactions: list/search/filter/paginate, create, parse, duplicate, delete,
+- Transactions: list/search/filter/paginate, create, edit, parse, duplicate, delete,
   account linking, and CSV export of the current result page.
 - Accounts: list, create, update, set default, and guarded delete.
 - Splits: friends, groups, shared bills, inline transaction splits, balances,

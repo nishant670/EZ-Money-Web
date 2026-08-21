@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #FDF5F7;
@@ -8,8 +9,16 @@
   --card: #FFFFFF;
   --border: #F0E5E7;
   --text-muted: #666666;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 2rem;
+  --chart-grid: #D8CDD0;
+  --chart-axis: #52525B;
+  --chart-tooltip: #FFFFFF;
+  --chart-positive: #15803D;
+  --glass-background: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  /* The two large radii of the product. Named off Tailwind's own scale so they
+     add utilities instead of redefining rounded-xl/2xl for every small control. */
+  --panel-radius: 2rem;
+  --surface-radius: 1.5rem;
 }
 
 @theme inline {
@@ -20,13 +29,13 @@
   --color-card: var(--card);
   --color-border: var(--border);
   --color-text-muted: var(--text-muted);
-  
-  --font-sans: 'Avenir Next', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-rounded: 'Avenir Next', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --radius-panel: var(--panel-radius);
+  --radius-surface: var(--surface-radius);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-rounded: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+.dark {
     --background: #1A1A1A;
     --foreground: #FAFAFA;
     --accent: #FF8865;
@@ -34,7 +43,12 @@
     --card: #242424;
     --border: #3C3C3C;
     --text-muted: #A0A0A0;
-  }
+    --chart-grid: #52525B;
+    --chart-axis: #D4D4D8;
+    --chart-tooltip: #242424;
+    --chart-positive: #4ADE80;
+    --glass-background: rgba(26, 26, 26, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 body {
@@ -50,15 +64,10 @@ body {
 }
 
 .glass-morphism {
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--glass-background);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.dark .glass-morphism {
-  background: rgba(26, 26, 26, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
 }
 
 @keyframes float {
@@ -69,4 +78,21 @@ body {
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+  .animate-float { animation: none !important; }
+  [class*="hover:scale-"]:hover, [class*="active:scale-"]:active { transform: none !important; }
 }

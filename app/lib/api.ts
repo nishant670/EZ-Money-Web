@@ -1,4 +1,5 @@
 import axios, { AxiosError } from "axios";
+import type { AccountType, PaymentMode } from "@/app/lib/accounts";
 
 export interface User {
     id: number;
@@ -22,7 +23,7 @@ export interface AuthResponse {
 export interface Account {
     id: number;
     user_id: number;
-    type: "cash" | "upi" | "bank" | "credit_card" | "debit_card" | "wallet" | "other";
+    type: AccountType;
     name: string;
     color: string;
     provider: string;
@@ -34,6 +35,28 @@ export interface Account {
     is_default: boolean;
     created_at: string;
     updated_at: string;
+    summary?: AccountSummary;
+}
+
+export interface AccountSummary {
+    spent_this_month: number;
+    received_this_month: number;
+    entries_this_month: number;
+    lifetime_spent: number;
+    lifetime_received: number;
+    entries_total: number;
+    last_activity_date?: string;
+    outstanding?: number;
+    credit_utilisation?: number;
+    running_balance?: number;
+    limit?: {
+        outstanding: number;
+        outstanding_source: "statement" | "ledger";
+        emi_blocked_principal: number;
+        credit_limit: number;
+        available_limit?: number;
+        utilisation_pct?: number;
+    };
 }
 
 export type AccountInput = Omit<Account, "id" | "user_id" | "created_at" | "updated_at">;
@@ -47,7 +70,7 @@ export interface Transaction {
     source: "manual" | "text" | "voice";
     type: "income" | "expense";
     category: string;
-    mode: string;
+    mode: PaymentMode;
     date: string;
     time?: string;
     merchant?: string;
@@ -89,7 +112,9 @@ export interface TransactionInput {
     amount: number;
     currency: "INR";
     source: "manual" | "text" | "voice";
-    mode: "Cash" | "UPI" | "Credit Card" | "Wallets";
+    // Omit for recognised account types; the API derives the canonical mode
+    // from account_id. "Other" accounts must send the user's explicit choice.
+    mode?: PaymentMode;
     category: string;
     merchant?: string;
     tags?: string[];
@@ -228,6 +253,7 @@ export interface EntrySplitInput {
 }
 
 export interface ParsedTransaction {
+    stage?: "draft";
     title?: string;
     type?: "income" | "expense";
     amount?: number;
@@ -241,6 +267,7 @@ export interface ParsedTransaction {
     date?: string;
     time?: string;
     account_hint?: string;
+    source_text?: string;
     confidence?: Record<string, number>;
     needs_confirmation?: Record<string, boolean>;
     missing_fields?: string[];
@@ -328,6 +355,19 @@ export interface RecurringCandidate {
     last_seen_date: string;
     next_expected_date: string;
     review_due: boolean;
+}
+
+export interface RecurringCandidateDecision {
+    id: number;
+    user_id: number;
+    candidate_key: string;
+    merchant: string;
+    category: string;
+    decision: "dismissed" | "snoozed" | "tracked";
+    snoozed_until?: string;
+    last_reviewed_at: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface DashboardResponse {
@@ -424,6 +464,11 @@ export interface Subscription {
     status: "active" | "paused" | "cancelled";
     reminder_days: number;
     cancel_before_due: boolean;
+    cancel_on_date: string;
+    autopay: boolean;
+    payment_mode: string;
+    transaction_tag: string;
+    purpose_type: string;
     notes: string;
     days_until_due: number;
     due_state: "scheduled" | "due_soon" | "overdue" | "paused" | "cancelled" | "unknown";
@@ -436,23 +481,10 @@ export type SubscriptionInput = Omit<
     "id" | "user_id" | "account" | "days_until_due" | "due_state" | "created_at" | "updated_at"
 >;
 
-export interface EMICalculation {
-    principal_amount: number;
-    currency: "INR";
-    annual_interest_rate_percent: number;
-    tenure_months: number;
-    monthly_emi: number;
-    total_payment: number;
-    total_interest: number;
-    schedule: Array<{
-        month: number;
-        opening_balance: number;
-        payment_amount: number;
-        principal_amount: number;
-        interest_amount: number;
-        closing_balance: number;
-    }>;
-}
+// `POST /v1/tools/emi/calculate` is still the mobile app's EMI engine
+// (EZ-Money/lib/emi.ts). The web computes EMI in app/lib/calculators.ts
+// instead, so it carries no client for that route; both are pinned to the
+// same fixture so the two platforms cannot drift.
 
 export interface AppNotification {
     id: number;
@@ -475,6 +507,64 @@ export interface NotificationListResponse {
     total_pages: number;
 }
 
+export interface CategoriesResponse {
+    categories: string[];
+    default: string;
+}
+
+export interface EntitlementPayload {
+    error?: string;
+    feature_code?: string;
+    feature_label?: string;
+    required_plan?: string;
+    required_credits?: number;
+    available_credits?: number;
+    daily_limit_remaining?: number;
+    reset_at?: string;
+    upgrade_required?: boolean;
+}
+
+export class EntitlementError extends Error {
+    readonly status: 402 | 403 | 429;
+    readonly code?: string;
+    readonly featureCode?: string;
+    readonly featureLabel?: string;
+    readonly requiredPlan?: string;
+    readonly requiredCredits?: number;
+    readonly availableCredits?: number;
+    readonly dailyLimitRemaining?: number;
+    readonly resetAt?: string;
+    readonly upgradeRequired: boolean;
+
+    constructor(status: 402 | 403 | 429, payload: EntitlementPayload = {}) {
+        super(status === 429 ? "Allowance temporarily exhausted" : "This feature needs a different plan");
+        this.name = "EntitlementError";
+        this.status = status;
+        this.code = payload.error;
+        this.featureCode = payload.feature_code;
+        this.featureLabel = payload.feature_label;
+        this.requiredPlan = payload.required_plan;
+        this.requiredCredits = payload.required_credits;
+        this.availableCredits = payload.available_credits;
+        this.dailyLimitRemaining = payload.daily_limit_remaining;
+        this.resetAt = payload.reset_at;
+        this.upgradeRequired = payload.upgrade_required ?? status !== 429;
+    }
+}
+
+export class SessionExpiredError extends Error {
+    constructor() {
+        super("Your session expired");
+        this.name = "SessionExpiredError";
+    }
+}
+
+export const AUTH_SESSION_EXPIRED_EVENT = "finnri:session-expired";
+
+export function asEntitlementError(error: unknown): EntitlementError | null {
+    return error instanceof EntitlementError ? error : null;
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 export const api = axios.create({
@@ -495,21 +585,40 @@ api.interceptors.response.use(
     (error: AxiosError) => {
         const isAuthenticationRequest = error.config?.url?.startsWith("/v1/auth/");
         if (error.response?.status === 401 && !isAuthenticationRequest && typeof window !== "undefined") {
+            const hadSession = Boolean(localStorage.getItem("finnri_token") || localStorage.getItem("finnri_user"));
             localStorage.removeItem("finnri_token");
             localStorage.removeItem("finnri_user");
+            if (hadSession) window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
+            return Promise.reject(new SessionExpiredError());
+        }
+        const status = error.response?.status;
+        const entitlementPayload = (error.response?.data || {}) as EntitlementPayload;
+        const isEntitlementResponse = status === 402
+            || (status === 403 && Boolean(entitlementPayload.feature_code || entitlementPayload.required_plan || entitlementPayload.upgrade_required))
+            || (status === 429 && Boolean(entitlementPayload.reset_at));
+        if (isEntitlementResponse && (status === 402 || status === 403 || status === 429)) {
+            return Promise.reject(new EntitlementError(
+                status,
+                entitlementPayload,
+            ));
         }
         return Promise.reject(error);
     },
 );
 
 export function apiErrorMessage(error: unknown, fallback: string) {
+    if (error instanceof SessionExpiredError) return "";
+    if (error instanceof EntitlementError) {
+        if (error.status === 429) return error.resetAt ? "Your allowance will be available again at the time shown." : "Your daily allowance will be available again soon.";
+        return error.requiredPlan ? `${error.featureLabel || "This feature"} is included with ${error.requiredPlan}.` : `${error.featureLabel || "This feature"} is not included in this workspace.`;
+    }
     if (!axios.isAxiosError(error)) return fallback;
     if (!error.response) {
         return "Cannot reach the FINNRI API. Confirm the backend is running and allows this web address.";
     }
-    const payload = error.response?.data as { message?: string; error?: string; fields?: Record<string, string> } | undefined;
+    const payload = error.response?.data as { message?: string; fields?: Record<string, string> } | undefined;
     const fieldMessage = payload?.fields ? Object.values(payload.fields)[0] : undefined;
-    return payload?.message || fieldMessage || payload?.error?.replaceAll("_", " ") || fallback;
+    return payload?.message || fieldMessage || fallback;
 }
 
 export const AuthAPI = {
@@ -528,6 +637,7 @@ export const AuthAPI = {
 
 export const EntriesAPI = {
     list: (params?: EntryListParams) => api.get<EntryListResponse>("/v1/entries", { params }),
+    get: (id: number) => api.get<Transaction>(`/v1/entries/${id}`),
     exportCSV: (params?: EntryListParams) => api.get<Blob>("/v1/entries/export", {
         params: { ...params, format: "csv" },
         responseType: "blob",
@@ -540,9 +650,23 @@ export const EntriesAPI = {
     delete: (id: number) => api.delete(`/v1/entries/${id}`),
 };
 
+export const CategoriesAPI = {
+    list: () => api.get<CategoriesResponse>("/v1/categories"),
+};
+
 export const DashboardAPI = {
     get: (params?: { start_date?: string; end_date?: string; tz?: string }) =>
         api.get<DashboardResponse>("/v1/dashboard", { params }),
+};
+
+export const RecurringCandidatesAPI = {
+    saveDecision: (data: {
+        candidate_key: string;
+        merchant?: string;
+        category?: string;
+        decision: "dismissed" | "snoozed" | "tracked";
+        snoozed_until?: string;
+    }) => api.post<RecurringCandidateDecision>("/v1/recurring-candidates/decision", data),
 };
 
 export const ReportsAPI = {
@@ -551,7 +675,7 @@ export const ReportsAPI = {
 };
 
 export const AccountsAPI = {
-    list: () => api.get<Account[]>("/v1/accounts"),
+    list: (tz?: string) => api.get<Account[]>("/v1/accounts", { params: tz ? { tz } : undefined }),
     create: (data: AccountInput) => api.post<Account>("/v1/accounts", data),
     update: (id: number, data: AccountInput) => api.put<Account>(`/v1/accounts/${id}`, data),
     delete: (id: number) => api.delete(`/v1/accounts/${id}`),
@@ -573,10 +697,6 @@ export const SubscriptionsAPI = {
     createReminders: () => api.post<{ created: number }>("/v1/subscriptions/reminders"),
 };
 
-export const ToolsAPI = {
-    calculateEMI: (data: { principal_amount: number; annual_interest_rate_percent: number; tenure_months: number; currency: "INR" }) =>
-        api.post<EMICalculation>("/v1/tools/emi/calculate", data),
-};
 
 export const SplitAPI = {
     listFriends: (status: "active" | "all" = "active") => api.get<SplitFriend[]>("/v1/split/friends", { params: { status } }),
@@ -588,6 +708,7 @@ export const SplitAPI = {
     updateGroup: (id: number, data: SplitGroupInput) => api.put<SplitGroup>(`/v1/split/groups/${id}`, data),
     archiveGroup: (id: number) => api.delete(`/v1/split/groups/${id}`),
     listBills: () => api.get<SplitBill[]>("/v1/split/bills"),
+    getBillForEntry: (entryID: number) => api.get<SplitBill | null>(`/v1/split/bills/by-entry/${entryID}`),
     createBill: (data: SplitBillInput) => api.post<SplitBill>("/v1/split/bills", data),
     updateBill: (id: number, data: SplitBillInput) => api.put<SplitBill>(`/v1/split/bills/${id}`, data),
     deleteBill: (id: number) => api.delete(`/v1/split/bills/${id}`),

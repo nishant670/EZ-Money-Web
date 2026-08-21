@@ -6,7 +6,9 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsc -p tsconfig.tests.json && TZ=Asia/Kolkata node --test .test-build/app/lib/*.test.js",
+    "test:calculators": "tsc -p tsconfig.tests.json && TZ=Asia/Kolkata node --test --test-name-pattern='EMI|SIP' .test-build/app/lib/calculators.test.js"
   },
   "dependencies": {
     "axios": "^1.13.2",

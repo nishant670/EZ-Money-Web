@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, AuthAPI } from "@/app/lib/api";
+import { AUTH_SESSION_EXPIRED_EVENT, User, AuthAPI } from "@/app/lib/api";
 import { useRouter } from "next/navigation";
 
 interface AuthContextType {
@@ -9,8 +9,13 @@ interface AuthContextType {
     token: string | null;
     isLoading: boolean;
     login: (token: string, user: User) => void;
+    updateUser: (user: User) => void;
     logout: () => void;
     loginAsGuest: () => Promise<void>;
+    isGuestClaimOpen: boolean;
+    beginGuestClaim: () => void;
+    closeGuestClaim: () => void;
+    claimGuest: (claimToken: string, pin: string) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,8 +23,13 @@ const AuthContext = createContext<AuthContextType>({
     token: null,
     isLoading: true,
     login: () => { },
+    updateUser: () => { },
     logout: () => { },
     loginAsGuest: async () => { },
+    isGuestClaimOpen: false,
+    beginGuestClaim: () => { },
+    closeGuestClaim: () => { },
+    claimGuest: async () => { throw new Error("No guest workspace to claim"); },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -28,6 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isGuestClaimOpen, setIsGuestClaimOpen] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -47,11 +58,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return () => window.clearTimeout(restoreTimer);
     }, []);
 
+    useEffect(() => {
+        const expireSession = () => {
+            setToken(null);
+            setUser(null);
+            sessionStorage.setItem("finnri_auth_notice", "Your session expired. Sign in again to continue.");
+            router.replace("/login");
+        };
+        window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, expireSession);
+        return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, expireSession);
+    }, [router]);
+
     const login = (newToken: string, newUser: User) => {
         setToken(newToken);
         setUser(newUser);
         localStorage.setItem("finnri_token", newToken);
         localStorage.setItem("finnri_user", JSON.stringify(newUser));
+        sessionStorage.removeItem("finnri_auth_notice");
+    };
+
+    const updateUser = (updatedUser: User) => {
+        setUser(updatedUser);
+        localStorage.setItem("finnri_user", JSON.stringify(updatedUser));
     };
 
     const logout = () => {
@@ -63,23 +91,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const loginAsGuest = async () => {
-        try {
-            const storedDeviceId = localStorage.getItem("finnri_web_device_id");
-            const deviceId = storedDeviceId || `web_${crypto.randomUUID()}`;
-            localStorage.setItem("finnri_web_device_id", deviceId);
-            const res = await AuthAPI.loginGuest(deviceId);
+        const storedDeviceId = localStorage.getItem("finnri_web_device_id");
+        const deviceId = storedDeviceId || `web_${crypto.randomUUID()}`;
+        localStorage.setItem("finnri_web_device_id", deviceId);
+        const res = await AuthAPI.loginGuest(deviceId);
 
-            const { token, user } = res.data;
-            login(token, user);
-            router.push("/dashboard");
-        } catch (error) {
-            console.error("Guest login failed", error);
-            throw error;
-        }
+        const { token, user } = res.data;
+        login(token, user);
+        router.push("/dashboard");
+    };
+
+    const claimGuest = async (claimToken: string, pin: string) => {
+        if (!user?.is_guest) throw new Error("No guest workspace to claim");
+        const storedDeviceId = localStorage.getItem("finnri_web_device_id");
+        const deviceId = storedDeviceId || `web_${crypto.randomUUID()}`;
+        localStorage.setItem("finnri_web_device_id", deviceId);
+        const response = await AuthAPI.register({
+            claim_token: claimToken,
+            pin,
+            guest_uuid: user.uuid,
+            device_id: deviceId,
+            biometrics_enabled: false,
+        });
+        login(response.data.token, response.data.user);
+        return response.data.user;
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, isLoading, login, logout, loginAsGuest }}>
+        <AuthContext.Provider value={{ user, token, isLoading, login, updateUser, logout, loginAsGuest, isGuestClaimOpen, beginGuestClaim: () => setIsGuestClaimOpen(true), closeGuestClaim: () => setIsGuestClaimOpen(false), claimGuest }}>
             {children}
         </AuthContext.Provider>
     );

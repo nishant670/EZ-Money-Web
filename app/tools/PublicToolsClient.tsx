@@ -10,160 +10,45 @@ import {
   ChartLine,
   CheckCircle2,
   ChevronDown,
-  FileText,
-  Grid2X2,
-  Home,
   IndianRupee,
   Menu,
   ShieldCheck,
   TrendingUp,
   X,
 } from "lucide-react";
+import { formatMoney } from "@/app/lib/format";
 import { cn } from "@/app/lib/utils";
-
-const currency = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0,
-});
+import {
+  calculateEMI,
+  calculateSIP,
+  type EMICalculation,
+  type SIPCalculation,
+  type SIPInput,
+  PROJECTION_DISCLAIMER,
+  SIP_PRESETS,
+  type SIPPresetID,
+  validateEMIInput,
+  validateSIPInput,
+} from "@/app/lib/calculators";
 
 type ActiveCalculator = "sip" | "emi";
-type SIPPresetID = "mutual_fund" | "ppf" | "nps" | "rd" | "custom";
-
-type SIPPreset = {
-  id: SIPPresetID;
-  label: string;
-  monthlyInvestment: number;
-  expectedAnnualReturnPercent: number;
-  tenureYears: number;
-  annualStepUpPercent: number;
-  currentCorpus: number;
-};
-
-type SIPCalculation = SIPPreset & {
-  investedAmount: number;
-  estimatedReturns: number;
-  maturityValue: number;
-  breakdown: Array<{ year: number; yearlyInvestment: number; yearEndValue: number }>;
-};
-
-type EMICalculation = {
-  monthlyEMI: number;
-  totalPayment: number;
-  totalInterest: number;
-  schedule: Array<{
-    month: number;
-    principalAmount: number;
-    interestAmount: number;
-    closingBalance: number;
-  }>;
-};
-
-const sipPresets: SIPPreset[] = [
-  { id: "mutual_fund", label: "Mutual Funds", monthlyInvestment: 10000, expectedAnnualReturnPercent: 12, tenureYears: 10, annualStepUpPercent: 10, currentCorpus: 0 },
-  { id: "ppf", label: "PPF", monthlyInvestment: 12500, expectedAnnualReturnPercent: 7, tenureYears: 15, annualStepUpPercent: 0, currentCorpus: 0 },
-  { id: "nps", label: "NPS", monthlyInvestment: 10000, expectedAnnualReturnPercent: 10, tenureYears: 20, annualStepUpPercent: 5, currentCorpus: 0 },
-  { id: "rd", label: "RD", monthlyInvestment: 5000, expectedAnnualReturnPercent: 6.5, tenureYears: 5, annualStepUpPercent: 0, currentCorpus: 0 },
-  { id: "custom", label: "Custom", monthlyInvestment: 10000, expectedAnnualReturnPercent: 8, tenureYears: 10, annualStepUpPercent: 0, currentCorpus: 0 },
-];
-
-function roundMoney(value: number) {
-  return Math.round(value);
-}
-
-function calculateSIP(input: SIPPreset): SIPCalculation {
-  const monthlyRate = input.expectedAnnualReturnPercent / 12 / 100;
-  const tenureMonths = Math.round(input.tenureYears * 12);
-  let value = input.currentCorpus;
-  let monthlyInvestment = input.monthlyInvestment;
-  let investedAmount = input.currentCorpus;
-  const breakdown: SIPCalculation["breakdown"] = [];
-
-  for (let month = 1; month <= tenureMonths; month += 1) {
-    value = value * (1 + monthlyRate) + monthlyInvestment;
-    investedAmount += monthlyInvestment;
-
-    if (month % 12 === 0 || month === tenureMonths) {
-      breakdown.push({
-        year: Math.ceil(month / 12),
-        yearlyInvestment: monthlyInvestment * (month % 12 === 0 ? 12 : month % 12),
-        yearEndValue: value,
-      });
-      monthlyInvestment *= 1 + input.annualStepUpPercent / 100;
-    }
-  }
-
-  return {
-    ...input,
-    investedAmount,
-    estimatedReturns: value - investedAmount,
-    maturityValue: value,
-    breakdown,
-  };
-}
-
-function calculateEMI(principal: number, annualInterestRatePercent: number, tenureMonths: number): EMICalculation {
-  const monthlyRate = annualInterestRatePercent / 12 / 100;
-  const monthlyEMI = monthlyRate === 0
-    ? roundMoney(principal / tenureMonths)
-    : roundMoney(principal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths) / (Math.pow(1 + monthlyRate, tenureMonths) - 1));
-
-  let balance = principal;
-  let totalPayment = 0;
-  let totalInterest = 0;
-  const schedule: EMICalculation["schedule"] = [];
-
-  for (let month = 1; month <= tenureMonths; month += 1) {
-    const interestAmount = roundMoney(balance * monthlyRate);
-    let principalAmount = monthlyEMI - interestAmount;
-    if (principalAmount <= 0 || principalAmount > balance || month === tenureMonths) {
-      principalAmount = balance;
-    }
-    const paymentAmount = principalAmount + interestAmount;
-    balance = Math.max(0, balance - principalAmount);
-    totalPayment += paymentAmount;
-    totalInterest += interestAmount;
-    schedule.push({ month, principalAmount, interestAmount, closingBalance: balance });
-    if (balance === 0) break;
-  }
-
-  return { monthlyEMI, totalPayment, totalInterest, schedule };
-}
-
-function validateSIP(input: SIPPreset) {
-  const errors: string[] = [];
-  if (!Number.isFinite(input.monthlyInvestment) || input.monthlyInvestment <= 0) errors.push("Monthly investment must be positive.");
-  if (!Number.isFinite(input.expectedAnnualReturnPercent) || input.expectedAnnualReturnPercent < 0 || input.expectedAnnualReturnPercent > 100) errors.push("Expected return must be between 0 and 100.");
-  if (!Number.isFinite(input.tenureYears) || input.tenureYears <= 0 || input.tenureYears > 60) errors.push("Tenure must be between 1 month and 60 years.");
-  if (!Number.isFinite(input.annualStepUpPercent) || input.annualStepUpPercent < 0 || input.annualStepUpPercent > 100) errors.push("Annual step-up must be between 0 and 100.");
-  if (!Number.isFinite(input.currentCorpus) || input.currentCorpus < 0) errors.push("Current corpus cannot be negative.");
-  return errors;
-}
-
-function validateEMI(principal: number, rate: number, months: number) {
-  const errors: string[] = [];
-  if (!Number.isFinite(principal) || principal <= 0) errors.push("Loan amount must be positive.");
-  if (!Number.isFinite(rate) || rate < 0 || rate > 100) errors.push("Interest rate must be between 0 and 100.");
-  if (!Number.isInteger(months) || months < 1 || months > 360) errors.push("Tenure must be between 1 and 360 months.");
-  return errors;
-}
 
 export default function PublicToolsClient() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCalculator, setActiveCalculator] = useState<ActiveCalculator>("sip");
   const [activeSIPPresetID, setActiveSIPPresetID] = useState<SIPPresetID>("mutual_fund");
-  const [sipInput, setSipInput] = useState<SIPPreset>(sipPresets[0]);
-  const [sipResult, setSipResult] = useState<SIPCalculation | null>(() => calculateSIP(sipPresets[0]));
+  const [sipInput, setSipInput] = useState<SIPInput>(SIP_PRESETS[0]);
+  const [sipResult, setSipResult] = useState<SIPCalculation | null>(() => calculateSIP(SIP_PRESETS[0]));
   const [sipError, setSipError] = useState("");
   const [showSIPBreakdown, setShowSIPBreakdown] = useState(false);
   const [principal, setPrincipal] = useState(1000000);
   const [rate, setRate] = useState(9);
   const [months, setMonths] = useState(60);
-  const [emiResult, setEmiResult] = useState<EMICalculation | null>(() => calculateEMI(1000000, 9, 60));
+  const [emiResult, setEmiResult] = useState<EMICalculation | null>(() => calculateEMI({ principalAmount: 1000000, annualInterestRatePercent: 9, tenureMonths: 60 }));
   const [emiError, setEmiError] = useState("");
   const [showEMISchedule, setShowEMISchedule] = useState(false);
 
-  const applySIPPreset = (preset: SIPPreset) => {
+  const applySIPPreset = (preset: SIPInput) => {
     setActiveSIPPresetID(preset.id);
     setSipInput(preset);
     setSipResult(calculateSIP(preset));
@@ -171,14 +56,14 @@ export default function PublicToolsClient() {
     setShowSIPBreakdown(false);
   };
 
-  const updateSIPInput = (patch: Partial<SIPPreset>) => {
+  const updateSIPInput = (patch: Partial<SIPInput>) => {
     setSipInput((current) => ({ ...current, ...patch, id: "custom", label: "Custom" }));
     setActiveSIPPresetID("custom");
   };
 
   const submitSIP = (event: FormEvent) => {
     event.preventDefault();
-    const errors = validateSIP(sipInput);
+    const errors = validateSIPInput(sipInput);
     if (errors.length) {
       setSipError(errors.join(" "));
       return;
@@ -191,14 +76,15 @@ export default function PublicToolsClient() {
   const submitEMI = (event: FormEvent) => {
     event.preventDefault();
     const roundedMonths = Math.round(months);
-    const errors = validateEMI(principal, rate, roundedMonths);
+    const input = { principalAmount: principal, annualInterestRatePercent: rate, tenureMonths: roundedMonths };
+    const errors = validateEMIInput(input);
     if (errors.length) {
       setEmiError(errors.join(" "));
       return;
     }
     setMonths(roundedMonths);
     setEmiError("");
-    setEmiResult(calculateEMI(principal, rate, roundedMonths));
+    setEmiResult(calculateEMI(input));
     setShowEMISchedule(false);
   };
 
@@ -267,7 +153,7 @@ export default function PublicToolsClient() {
             </div>
           </div>
 
-          <section id="calculators" className="rounded-[2rem] border border-border bg-background p-4 shadow-2xl shadow-zinc-950/10 sm:p-5">
+          <section id="calculators" className="rounded-panel border border-border bg-background p-4 shadow-2xl shadow-zinc-950/10 sm:p-5">
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-1 dark:bg-zinc-900">
               {[
                 { id: "sip" as const, label: "SIP Calculator", icon: ChartLine },
@@ -289,13 +175,13 @@ export default function PublicToolsClient() {
 
             {activeCalculator === "sip" ? (
               <div className="mt-5 grid gap-5 xl:grid-cols-[0.88fr_1.12fr]">
-                <form onSubmit={submitSIP} className="space-y-4 rounded-[1.5rem] border border-border bg-white p-5 dark:bg-zinc-900">
+                <form onSubmit={submitSIP} className="space-y-4 rounded-surface border border-border bg-white p-5 dark:bg-zinc-900">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">SIP details</p>
                     <h2 className="mt-1 text-xl font-bold font-rounded">Investment projection</h2>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {sipPresets.map((preset) => (
+                    {SIP_PRESETS.map((preset) => (
                       <button key={preset.id} type="button" onClick={() => applySIPPreset(preset)} className={cn("rounded-full border px-3 py-2 text-xs font-bold", activeSIPPresetID === preset.id ? "border-accent bg-accent text-white" : "border-border bg-zinc-50 text-zinc-500 dark:bg-zinc-800")}>
                         {preset.label}
                       </button>
@@ -317,11 +203,11 @@ export default function PublicToolsClient() {
                 </form>
                 <ResultPanel
                   title="Estimated maturity value"
-                  primary={sipResult ? currency.format(sipResult.maturityValue) : "Calculate to view"}
+                  primary={sipResult ? formatMoney(sipResult.maturityValue) : "Calculate to view"}
                   empty={!sipResult}
                   metrics={sipResult ? [
-                    { label: "Invested amount", value: currency.format(sipResult.investedAmount) },
-                    { label: "Estimated returns", value: currency.format(sipResult.estimatedReturns), accent: true },
+                    { label: "Invested amount", value: formatMoney(sipResult.investedAmount) },
+                    { label: "Estimated returns", value: formatMoney(sipResult.estimatedReturns), accent: true },
                   ] : []}
                 >
                   {sipResult && (
@@ -332,7 +218,7 @@ export default function PublicToolsClient() {
                       {showSIPBreakdown && (
                         <ScheduleTable
                           headers={["Year", "Invested", "Value"]}
-                          rows={sipResult.breakdown.map((row) => [String(row.year), currency.format(row.yearlyInvestment), currency.format(row.yearEndValue)])}
+                          rows={sipResult.breakdown.map((row) => [String(row.year), formatMoney(row.yearlyInvestment), formatMoney(row.yearEndValue)])}
                         />
                       )}
                     </>
@@ -341,7 +227,7 @@ export default function PublicToolsClient() {
               </div>
             ) : (
               <div className="mt-5 grid gap-5 xl:grid-cols-[0.88fr_1.12fr]">
-                <form onSubmit={submitEMI} className="space-y-4 rounded-[1.5rem] border border-border bg-white p-5 dark:bg-zinc-900">
+                <form onSubmit={submitEMI} className="space-y-4 rounded-surface border border-border bg-white p-5 dark:bg-zinc-900">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">EMI details</p>
                     <h2 className="mt-1 text-xl font-bold font-rounded">Loan repayment estimate</h2>
@@ -365,11 +251,11 @@ export default function PublicToolsClient() {
                 </form>
                 <ResultPanel
                   title="Estimated monthly EMI"
-                  primary={emiResult ? currency.format(emiResult.monthlyEMI) : "Calculate to view"}
+                  primary={emiResult ? formatMoney(emiResult.monthlyEMI) : "Calculate to view"}
                   empty={!emiResult}
                   metrics={emiResult ? [
-                    { label: "Total payment", value: currency.format(emiResult.totalPayment) },
-                    { label: "Total interest", value: currency.format(emiResult.totalInterest), accent: true },
+                    { label: "Total payment", value: formatMoney(emiResult.totalPayment) },
+                    { label: "Total interest", value: formatMoney(emiResult.totalInterest), accent: true },
                   ] : []}
                 >
                   {emiResult && (
@@ -380,7 +266,7 @@ export default function PublicToolsClient() {
                       {showEMISchedule && (
                         <ScheduleTable
                           headers={["Month", "Principal", "Interest", "Balance"]}
-                          rows={emiResult.schedule.map((row) => [String(row.month), currency.format(row.principalAmount), currency.format(row.interestAmount), currency.format(row.closingBalance)])}
+                          rows={emiResult.schedule.map((row) => [String(row.month), formatMoney(row.principalAmount), formatMoney(row.interestAmount), formatMoney(row.closingBalance)])}
                         />
                       )}
                     </>
@@ -417,31 +303,6 @@ export default function PublicToolsClient() {
         </div>
       </section>
 
-      <section className="bg-zinc-950 py-20 text-white">
-        <div className="container mx-auto px-6">
-          <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-center">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">More tools</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight font-rounded">More public calculators are planned</h2>
-              <p className="mt-4 max-w-2xl text-zinc-400 leading-7">The web tools page is set up for public discovery. HRA, ITR, and additional planning tools can be added here as they become available.</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                { icon: Home, label: "HRA", caption: "Tax rent" },
-                { icon: FileText, label: "ITR", caption: "Tax filing" },
-                { icon: Grid2X2, label: "More", caption: "Planned" },
-              ].map((tool) => (
-                <div key={tool.label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <tool.icon className="h-5 w-5 text-accent" />
-                  <p className="mt-4 font-bold">{tool.label}</p>
-                  <p className="mt-1 text-xs text-zinc-400">{tool.caption}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section id="faq" className="py-20">
         <div className="container mx-auto max-w-4xl px-6">
           <h2 className="text-3xl font-bold tracking-tight font-rounded">Calculator FAQ</h2>
@@ -449,7 +310,7 @@ export default function PublicToolsClient() {
             {[
               { q: "Is the EMI calculator free?", a: "Yes. The EMI calculator on this page is free and does not require login." },
               { q: "Is the SIP calculator free?", a: "Yes. You can estimate SIP maturity value, invested amount, returns, and yearly growth without an account." },
-              { q: "Are the calculations financial advice?", a: "No. These are informational estimates based on the inputs you provide." },
+              { q: "Are the calculations financial advice?", a: PROJECTION_DISCLAIMER },
             ].map((faq) => (
               <details key={faq.q} className="rounded-2xl border border-border bg-white p-6 dark:bg-zinc-900">
                 <summary className="cursor-pointer text-lg font-bold">{faq.q}</summary>
@@ -523,7 +384,7 @@ function ResultPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-border bg-white p-5 dark:bg-zinc-900 sm:p-6">
+    <div className="rounded-surface border border-border bg-white p-5 dark:bg-zinc-900 sm:p-6">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">{title}</p>
       <p className={cn("mt-3 text-4xl font-bold font-rounded sm:text-5xl", empty && "text-zinc-400")}>{primary}</p>
       {metrics.length > 0 && (
