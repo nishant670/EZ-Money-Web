@@ -2,7 +2,7 @@
 
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { AdminAPI, AdminAPIError } from "@/app/lib/admin-api";
 
 function AdminLoginForm() {
@@ -10,6 +10,7 @@ function AdminLoginForm() {
     const search = useSearchParams();
     const [email, setEmail] = useState("");
     const [pin, setPin] = useState("");
+    const [showPin, setShowPin] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     async function submit(event: FormEvent) {
@@ -65,14 +66,25 @@ function AdminLoginForm() {
                         <KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-text-muted" />
                         <input
                             required
+                            type={showPin ? "text" : "password"}
+                            autoComplete="current-password"
                             inputMode="numeric"
                             pattern="[0-9]{4}"
                             maxLength={4}
                             value={pin}
                             onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
-                            className="min-h-12 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-lg tracking-[0.4em] outline-none focus:border-accent"
+                            className="min-h-12 w-full rounded-xl border border-border bg-background pl-12 pr-12 text-lg tracking-[0.4em] outline-none focus:border-accent"
                             placeholder="••••"
                         />
+                        <button
+                            type="button"
+                            onClick={() => setShowPin((shown) => !shown)}
+                            aria-label={showPin ? "Hide PIN" : "Show PIN"}
+                            aria-pressed={showPin}
+                            className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-text-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent"
+                        >
+                            {showPin ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
                     </div>
                 </label>
                 <button
