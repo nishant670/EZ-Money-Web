@@ -9,6 +9,7 @@ import { cn } from "@/app/lib/utils";
 import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
 import { useToast } from "@/app/components/ui/Toast";
 import { PageSkeleton } from "@/app/components/ui/Skeleton";
+import { readJoinedGroupID, withoutJoinedGroup } from "@/app/lib/split-invite";
 
 type SplitSection = "friends" | "groups" | "bills" | "settlements" | "balances" | "activity";
 type SectionErrors = Partial<Record<SplitSection, string>>;
@@ -120,6 +121,20 @@ export default function SplitsScreen() {
     }, []);
 
     useEffect(() => { void loadSplits(); }, [loadSplits]);
+
+    // Arriving from a web invite: say the join worked and show the group,
+    // instead of leaving a new member on an empty Balances section. Runs once
+    // the sections have rendered, then strips the param so a refresh is quiet.
+    useEffect(() => {
+        if (!hasLoaded) return;
+        const joinedID = readJoinedGroupID(window.location.search);
+        if (joinedID === null) return;
+        const joined = groups.find((group) => group.id === joinedID);
+        toast({ title: joined ? `You joined ${joined.name}` : "You joined the group", description: "It is listed under Groups." });
+        window.history.replaceState(window.history.state, "", `${window.location.pathname}${withoutJoinedGroup(window.location.search)}#groups`);
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        document.getElementById("groups")?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    }, [hasLoaded, groups, toast]);
 
     const totals = useMemo(() => balances.reduce((summary, balance) => {
         if (balance.net_balance > 0) summary.owedToYou += balance.net_balance;
