@@ -150,13 +150,16 @@ export default async function Home() {
 
             <div className="relative lg:h-[600px] flex justify-center items-center">
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-accent/10 blur-[100px] rounded-full" />
-              <div className="relative w-full max-w-[450px] aspect-[4/5] animate-float">
+              {/* The real Android app's Home screen, no device frame: launch is
+                  Android-only, and an iPhone render showed a phone visitors could
+                  not install on. Demo data, not a real user's. */}
+              <div className="relative w-full max-w-[360px] aspect-[4/5] animate-float overflow-hidden rounded-[2rem] border border-border bg-white shadow-2xl dark:bg-zinc-900">
                 <Image
-                  src="/hero.webp"
-                  alt="The Finnri app showing a Confirm Transaction card — Coffee, ₹150, category Food — waiting to be swiped to confirm"
+                  src="/hero-app-home.webp"
+                  alt="Finnri's Home screen: October spending so far, ₹8,140, with Food & Drinks as the biggest category, above the tap-and-speak button for logging an expense by voice"
                   fill
-                  sizes="(min-width: 1024px) 450px, 90vw"
-                  className="object-contain drop-shadow-2xl"
+                  sizes="(min-width: 1024px) 360px, 90vw"
+                  className="object-cover object-top"
                   priority
                 />
               </div>
@@ -357,14 +360,15 @@ export default async function Home() {
                     <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full" />
                     <div className="w-2.5 h-2.5 bg-green-400 rounded-full" />
                   </div>
-                  <div className="p-12 h-full flex flex-col justify-center gap-6">
-                    <div className="h-4 w-1/3 bg-zinc-200 dark:bg-zinc-700 rounded-full" />
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="h-24 bg-accent/20 rounded-xl" />
-                      <div className="h-24 bg-accent/10 rounded-xl" />
-                      <div className="h-24 bg-zinc-200 dark:bg-zinc-700 rounded-xl" />
-                    </div>
-                    <div className="h-32 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl" />
+                  {/* A real /dashboard capture, with demo data. */}
+                  <div className="absolute inset-x-0 top-8 bottom-0">
+                    <Image
+                      src="/dashboard-overview.webp"
+                      alt="The Finnri web dashboard Overview for the last 30 days: ₹28,798 spent, ₹1,07,000 income and ₹78,202 net cash flow, with an unusual-spending insight below"
+                      fill
+                      sizes="(min-width: 1024px) 560px, 90vw"
+                      className="object-cover object-left-top"
+                    />
                   </div>
                 </div>
                 {/* Floating badge */}
