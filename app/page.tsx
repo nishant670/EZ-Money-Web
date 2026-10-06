@@ -13,18 +13,22 @@ import {
   CreditCard,
   TrendingUp,
   Smartphone,
-  ArrowDownRight
+  ArrowDownRight,
+  Users
 } from "lucide-react";
 import MarketingNav from "@/app/components/marketing/MarketingNav";
-import { LEGAL_BUSINESS_NAME, MERCHANT_IDENTITY_PUBLISHED, PLAY_STORE_URL, SITE_URL } from "@/app/lib/site";
-import { formatMinor } from "@/app/lib/billing-format";
+import { LEGAL_BUSINESS_NAME, MERCHANT_IDENTITY_PUBLISHED, PLAY_STORE_LISTED, PLAY_STORE_URL, SITE_URL } from "@/app/lib/site";
+import { discountPercent, formatMinor } from "@/app/lib/billing-format";
 import { fetchPublishedPrices, intervalDuration } from "@/app/lib/public-plans";
 
 const faqs = [
   { q: "Do I need to connect my bank?", a: "No. Finnri does not connect to banks or automatically import bank activity. You record transactions yourself by voice, text, or manual entry and maintain your own account labels and balances." },
   { q: "How does voice input work?", a: "In the mobile app, tap the microphone and speak naturally. Finnri sends the audio for transcription, creates an editable draft, and waits for your confirmation before saving a transaction." },
   { q: "What happens to voice and text drafts?", a: "Voice audio is held only long enough to transcribe it. Parse attempts, raw provider prompts, and raw provider responses are not persisted. A confirmed transaction may retain its source text as editable provenance." },
-  { q: "Can I export my data?", a: "Yes. CSV export of the current transaction view is available today. PDF export is not available on the web, and CSV is not advertised as a paid-only feature." },
+  { q: "Can I export my data?", a: "Yes. Export any transaction view from the web dashboard as a CSV file, on the free plan or a paid pass." },
+  { q: "Is Finnri free?", a: "Yes. Tracking, accounts, search, splits with friends and CSV export are free. Signing in with Google adds 1,000 AI credits to use over your first 30 days. Paid passes add more AI credits plus budgets, insights and subscription reminders." },
+  { q: "Do paid passes renew automatically?", a: "No. Every pass is a one-time payment for a fixed period: 7, 30, 90 or 365 days. Nothing is debited again unless you choose to buy another pass." },
+  { q: "Is there an iPhone app?", a: "Not yet. Finnri is Android-first, and the web dashboard works in any browser, including on an iPhone." },
 ];
 
 export const metadata: Metadata = {
@@ -40,17 +44,16 @@ export const metadata: Metadata = {
   },
 };
 
-// The cheapest published plan is read from the API for the same reason
-// `/pricing` is: an owner can change prices from the admin console, and a
-// retyped "from" price is the one a visitor sees first.
+// The plan list is read from the API for the same reason `/pricing` is: an
+// owner can change prices from the admin console, and a retyped price is the
+// one a visitor sees first.
 export const revalidate = 3600;
 
 export default async function Home() {
   const { plans } = await fetchPublishedPrices();
-  const cheapest = plans.reduce<typeof plans[number] | null>(
-    (lowest, plan) => (lowest === null || (plan.price_minor ?? 0) < (lowest.price_minor ?? 0) ? plan : lowest),
-    null,
-  );
+  // The API attaches the same offer to every plan it covers, so any one of
+  // them carries the label.
+  const launchOffer = plans.find((plan) => plan.offer)?.offer ?? null;
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -117,11 +120,17 @@ export default async function Home() {
                   conversion sit together, and Free Tools — which also has the
                   nav and its own section CTA — takes the second row. */}
               <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-8">
-                <a href={PLAY_STORE_URL} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-zinc-950 px-6 py-4 font-bold text-white shadow-xl shadow-zinc-950/10 transition-all hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200">
-                  <Smartphone className="h-5 w-5" />
-                  Get the Android app
-                </a>
-                <Link href="/login" className="group flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-border bg-white px-6 py-4 font-bold shadow-md transition-all hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700">
+                {PLAY_STORE_LISTED && (
+                  <a href={PLAY_STORE_URL} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-zinc-950 px-6 py-4 font-bold text-white shadow-xl shadow-zinc-950/10 transition-all hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200">
+                    <Smartphone className="h-5 w-5" />
+                    Get the Android app
+                  </a>
+                )}
+                {/* With no public store listing, the dashboard is the way in, so
+                    it takes the primary styling the Play button would have had. */}
+                <Link href="/login" className={PLAY_STORE_LISTED
+                  ? "group flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-border bg-white px-6 py-4 font-bold shadow-md transition-all hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                  : "group flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-zinc-950 px-6 py-4 font-bold text-white shadow-xl shadow-zinc-950/10 transition-all hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"}>
                   <LayoutDashboard className="w-5 h-5 text-accent" />
                   Open Web Dashboard
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -131,6 +140,13 @@ export default async function Home() {
                   Explore Free Tools
                 </Link>
               </div>
+
+              {!PLAY_STORE_LISTED && (
+                <p className="-mt-2 mb-8 flex items-center gap-2 text-sm text-text-muted">
+                  <Smartphone className="h-4 w-4 shrink-0 text-accent" />
+                  The Android app is in closed testing. The web dashboard is open to everyone today.
+                </p>
+              )}
 
               <div className="flex flex-wrap gap-8 items-center border-t border-border pt-8">
                 <div className="flex items-center gap-2">
@@ -236,13 +252,13 @@ export default async function Home() {
               },
               {
                 icon: <TrendingUp className="w-6 h-6" />,
-                title: "Insights & Trends",
-                desc: "Compare totals and patterns calculated from the transactions you have confirmed."
+                title: "Budgets & Insights",
+                desc: "Set category budgets and see trends and unusual spending, calculated from the transactions you have confirmed."
               },
               {
-                icon: <ShieldCheck className="w-6 h-6" />,
-                title: "Confirm-first Trust",
-                desc: "AI suggests, you decide. Full control over what gets saved."
+                icon: <Users className="w-6 h-6" />,
+                title: "Split with Friends",
+                desc: "Share trips, flatmates and dinners in a group, see who owes whom, and settle up. Invite anyone with a link."
               },
               {
                 icon: <LayoutDashboard className="w-6 h-6" />,
@@ -273,6 +289,7 @@ export default async function Home() {
                   { title: "Track UPI spending", icon: <Smartphone className="text-accent" /> },
                   { title: "Label credit card expenses", icon: <CreditCard className="text-accent" /> },
                   { title: "Set category budgets", icon: <Wallet className="text-accent" /> },
+                  { title: "Split rent and trips with friends", icon: <Users className="text-accent" /> },
                   { title: "Separate freelance records with tags", icon: <TrendingUp className="text-accent" /> }
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl hover:bg-white/10 transition-colors border border-white/10">
@@ -298,10 +315,10 @@ export default async function Home() {
                 <div className="bg-white p-6 rounded-2xl shadow-xl space-y-4 translate-x-12 dark:bg-zinc-800">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center dark:bg-zinc-700">🛒</div>
+                      <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center dark:bg-zinc-700">☕</div>
                       <div>
-                        <p className="text-zinc-900 font-bold dark:text-white">Starbucks</p>
-                        <p className="text-xs text-zinc-600 dark:text-zinc-300">Coffee • Bangalore</p>
+                        <p className="text-zinc-900 font-bold dark:text-white">Coffee with Riya</p>
+                        <p className="text-xs text-zinc-600 dark:text-zinc-300">Food & Drinks • UPI</p>
                       </div>
                     </div>
                     <span className="text-zinc-900 font-bold dark:text-white">₹320</span>
@@ -345,7 +362,7 @@ export default async function Home() {
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center text-zinc-950"><CheckCircle2 className="w-4 h-4" /></div>
-                    Use budgets, recurring-payment reviews, and planning tools
+                    Manage split groups, budgets, subscriptions, and planning tools
                   </li>
                 </ul>
                 <Link href="/tools" className="inline-flex items-center gap-2 bg-accent px-8 py-4 rounded-2xl font-bold text-zinc-950 shadow-lg shadow-accent/20 hover:scale-105 transition-transform">
@@ -429,37 +446,71 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Availability Section */}
-      <section id="availability" className="py-24 bg-accent-secondary/10">
+      {/* Pricing Section */}
+      <section id="pricing" className="py-24 bg-accent-secondary/10">
         <div className="container mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">What is available today</h2>
-            <p className="text-text-muted">Start free, then choose a fixed-duration pass when you need more AI credits and paid features.</p>
+            <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">Simple, fixed-price passes</h2>
+            <p className="text-text-muted">Start free. When you want more AI capture and the paid features, buy a pass for as long as you need it. It never renews on its own.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid lg:grid-cols-[2fr_3fr] gap-8 max-w-5xl mx-auto">
             <div className="p-8 rounded-panel border border-border bg-white dark:bg-zinc-800 flex flex-col justify-between">
               <div>
                 <h3 className="text-2xl font-bold mb-2">Finnri Free</h3>
-                <p className="text-text-muted mb-6">Core tracking and a limited AI trial.</p>
-                <div className="text-4xl font-bold mb-8 font-rounded">₹0 <span className="text-sm font-normal text-zinc-600 dark:text-zinc-300">/mo</span></div>
+                <p className="text-text-muted mb-6">Everything you need to track money yourself.</p>
+                <div className="text-4xl font-bold mb-8 font-rounded">₹0 <span className="text-sm font-normal text-zinc-600 dark:text-zinc-300">no card needed</span></div>
                 <ul className="space-y-4 mb-8">
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Manual transaction and account tracking</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Search, filters, and basic dashboard totals</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> CSV export of transaction views</li>
-                  <li className="flex items-center gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 text-accent" /> Limited trial credits for AI capture</li>
+                  <li className="flex items-start gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-accent" /> Unlimited manual transactions and accounts</li>
+                  <li className="flex items-start gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-accent" /> Search, filters, and dashboard totals</li>
+                  <li className="flex items-start gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-accent" /> Split groups with friends</li>
+                  <li className="flex items-start gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-accent" /> CSV export of transaction views</li>
+                  {/* LoggedInFreeTrialCredits and TrialDuration in the API's
+                      internal/billing/credits.go. */}
+                  <li className="flex items-start gap-3 text-sm font-medium"><CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-accent" /> 1,000 AI credits for your first 30 days</li>
                 </ul>
               </div>
-              <Link href="/login" className="w-full py-4 rounded-2xl border-2 border-foreground text-center font-bold hover:bg-foreground hover:text-background transition-all">Get started</Link>
+              <Link href="/login" className="w-full py-4 rounded-2xl border-2 border-foreground text-center font-bold hover:bg-foreground hover:text-background transition-all">Get started free</Link>
             </div>
-            <div className="p-8 rounded-panel border border-border bg-white/60 dark:bg-zinc-800/60 relative overflow-hidden flex flex-col justify-between">
-              <div className="absolute top-4 right-4 bg-accent px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-zinc-950">Coming Soon</div>
+
+            <div className="p-8 rounded-panel border-2 border-accent/60 bg-white dark:bg-zinc-800 flex flex-col justify-between shadow-xl shadow-accent/10">
               <div>
-                <h3 className="text-2xl font-bold mb-2">Paid passes</h3>
-                <p className="text-text-muted mb-6">{cheapest ? `From ${formatMinor(cheapest.price_minor ?? 0, cheapest.currency)} for ${intervalDuration(cheapest.billing_interval)}.` : "Fixed-duration passes, priced in INR."}</p>
-                <p className="text-sm leading-6 text-text-muted">Every purchase has a fixed duration and does not auto-renew. Compare included credits, daily limits, and longer-duration options before paying.</p>
+                <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                  <h3 className="text-2xl font-bold">Paid passes</h3>
+                  {launchOffer && (
+                    <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold uppercase tracking-wider text-zinc-950">{launchOffer.label}</span>
+                  )}
+                </div>
+                <p className="text-text-muted mb-6">More AI credits, plus budgets, insights, weekly reviews and subscription reminders.</p>
+                <ul className="divide-y divide-border rounded-2xl border border-border">
+                  {plans.map((plan) => {
+                    const charged = plan.offer?.price_minor ?? plan.price_minor ?? 0;
+                    const crossedOut = plan.offer ? plan.offer.original_price_minor : (discountPercent(plan) != null ? plan.list_price_minor : null);
+                    return (
+                      <li key={plan.code} className="flex items-center justify-between gap-4 px-5 py-4">
+                        <div className="min-w-0">
+                          <p className="font-bold">{plan.name}</p>
+                          <p className="text-xs text-text-muted">{intervalDuration(plan.billing_interval)} · {plan.included_credits.toLocaleString("en-IN")} AI credits</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-xl font-bold font-rounded">{formatMinor(charged, plan.currency)}</p>
+                          {crossedOut != null && (
+                            <p className="text-xs text-text-muted"><s>{formatMinor(crossedOut, plan.currency)}</s></p>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="mt-4 text-xs leading-5 text-text-muted">
+                  {launchOffer ? "Launch price is for your first pass, while the offer lasts. " : ""}
+                  One-time payment in INR via Razorpay. No auto-renewal. The exact amount is shown again before you pay.
+                </p>
               </div>
-              <Link href="/pricing" className="mt-8 w-full rounded-2xl bg-zinc-950 py-4 text-center text-sm font-bold text-white dark:bg-white dark:text-zinc-950">See pricing</Link>
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                <Link href="/dashboard/billing" className="rounded-2xl bg-zinc-950 py-4 text-center text-sm font-bold text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200">Choose a pass</Link>
+                <Link href="/pricing" className="rounded-2xl border border-border py-4 text-center text-sm font-bold transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-700">Pricing details</Link>
+              </div>
             </div>
           </div>
         </div>

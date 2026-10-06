@@ -9,7 +9,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { apiErrorMessage, isApiUnreachable, SplitAPI, type SplitInvitePreview } from "@/app/lib/api";
 import { rememberAuthReturnTo } from "@/app/lib/auth-return";
 import { joinedGroupPath } from "@/app/lib/split-invite";
-import { PLAY_STORE_URL } from "@/app/lib/site";
+import { PLAY_STORE_LISTED, PLAY_STORE_URL } from "@/app/lib/site";
 
 /**
  * Two different failures reach this screen and they are not interchangeable.
@@ -140,9 +140,11 @@ export default function InviteClient({ token }: { token: string }) {
                         invite, this page is still the first thing a stranger has ever
                         seen of Finnri, and it used to hide the only route into the
                         product behind a successful preview fetch. */}
-                    {phase.name !== "loading" && (
+                    {phase.name !== "loading" && (PLAY_STORE_LISTED ? (
                         <a href={PLAY_STORE_URL} target="_blank" rel="noreferrer" className="mt-5 inline-flex min-h-12 items-center justify-center text-sm font-bold text-accent hover:underline">Get Finnri on Google Play</a>
-                    )}
+                    ) : (
+                        <Link href="/login" className="mt-5 inline-flex min-h-12 items-center justify-center text-sm font-bold text-accent hover:underline">Use Finnri on the web</Link>
+                    ))}
                 </div>
             </section>
         </main>

@@ -17,10 +17,29 @@ export interface PublicPlan {
     name: string;
     billing_interval: BillingInterval;
     price_minor: number | null;
+    /** The crossed-out full price the app also shows; null when there is none. */
+    list_price_minor: number | null;
     currency: string;
     included_credits: number;
     daily_credit_limit: number;
     requires_prior_paid_months: number;
+    /**
+     * Present only while the launch offer runs (`LAUNCH_OFFER_STARTS_AT` on the
+     * API). `price_minor` stays the regular price; this is what checkout charges
+     * an eligible first-time buyer.
+     */
+    offer?: PlanOffer;
+}
+
+export interface PlanOffer {
+    code: string;
+    label: string;
+    percent_off: number;
+    price_minor: number;
+    original_price_minor: number;
+    ends_at: string;
+    /** Sent only when few places remain. */
+    spots_left?: number;
 }
 
 /** How long a pass lasts, in the plain terms the page is written in. */
@@ -44,10 +63,10 @@ export function intervalDuration(interval: string): string {
  * Keep in step with `internal/http/billing.go`.
  */
 const FALLBACK_PLANS: PublicPlan[] = [
-    { code: "weekly_pass", name: "Weekly Pass", billing_interval: "weekly", price_minor: 7900, currency: "INR", included_credits: 800, daily_credit_limit: 200, requires_prior_paid_months: 0 },
-    { code: "monthly", name: "Monthly", billing_interval: "monthly", price_minor: 14900, currency: "INR", included_credits: 3600, daily_credit_limit: 250, requires_prior_paid_months: 0 },
-    { code: "quarterly", name: "Quarterly", billing_interval: "quarterly", price_minor: 32900, currency: "INR", included_credits: 11000, daily_credit_limit: 300, requires_prior_paid_months: 0 },
-    { code: "yearly", name: "Yearly", billing_interval: "yearly", price_minor: 79900, currency: "INR", included_credits: 48000, daily_credit_limit: 350, requires_prior_paid_months: 0 },
+    { code: "weekly_pass", name: "Weekly Pass", billing_interval: "weekly", price_minor: 7900, list_price_minor: 19900, currency: "INR", included_credits: 800, daily_credit_limit: 200, requires_prior_paid_months: 0 },
+    { code: "monthly", name: "Monthly", billing_interval: "monthly", price_minor: 14900, list_price_minor: 49900, currency: "INR", included_credits: 3600, daily_credit_limit: 250, requires_prior_paid_months: 0 },
+    { code: "quarterly", name: "Quarterly", billing_interval: "quarterly", price_minor: 32900, list_price_minor: 129900, currency: "INR", included_credits: 11000, daily_credit_limit: 300, requires_prior_paid_months: 0 },
+    { code: "yearly", name: "Yearly", billing_interval: "yearly", price_minor: 79900, list_price_minor: 399900, currency: "INR", included_credits: 48000, daily_credit_limit: 350, requires_prior_paid_months: 0 },
 ];
 
 function apiBase() {

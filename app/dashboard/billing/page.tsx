@@ -287,7 +287,7 @@ function PlanCard({
                 </li>
                 <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" />
-                    Budgets, insights, splits and exports
+                    Budgets, insights and reminders
                 </li>
             </ul>
 
