@@ -30,6 +30,8 @@
     "app/lib/sentry-privacy.ts",
     "app/lib/sentry-privacy.test.ts",
     "app/lib/analytics.ts",
-    "app/lib/analytics.test.ts"
+    "app/lib/analytics.test.ts",
+    "app/lib/split-invite.ts",
+    "app/lib/split-invite.test.ts"
   ]
 }

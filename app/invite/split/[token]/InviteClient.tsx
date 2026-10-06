@@ -8,6 +8,7 @@ import { ArrowRight, ExternalLink, Loader2, RefreshCw, Users } from "lucide-reac
 import { useAuth } from "@/app/context/AuthContext";
 import { apiErrorMessage, isApiUnreachable, SplitAPI, type SplitInvitePreview } from "@/app/lib/api";
 import { rememberAuthReturnTo } from "@/app/lib/auth-return";
+import { joinedGroupPath } from "@/app/lib/split-invite";
 import { PLAY_STORE_URL } from "@/app/lib/site";
 
 /**
@@ -59,7 +60,7 @@ export default function InviteClient({ token }: { token: string }) {
         setAcceptError("");
         try {
             await SplitAPI.acceptInvite(token);
-            router.replace("/dashboard/splits");
+            router.replace(joinedGroupPath(phase.name === "ready" ? phase.invite.group_id : null));
         } catch (error) {
             setAcceptError(apiErrorMessage(error, "Finnri could not join this group."));
         } finally {
