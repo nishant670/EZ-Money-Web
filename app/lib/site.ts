@@ -20,6 +20,12 @@ export const SITE_URL = configuredSiteURL || "http://localhost:3000";
 export const PLAY_STORE_URL = process.env.NEXT_PUBLIC_PLAY_STORE_URL?.trim()
     || "https://play.google.com/store/apps/details?id=com.finnri.app";
 
+// While the app is in closed testing its Play listing 404s for everyone who is
+// not an opted-in tester, so a public "Get the Android app" button is a dead
+// end. Set NEXT_PUBLIC_PLAY_STORE_LISTED=true on the day the listing goes
+// public, and the store buttons appear.
+export const PLAY_STORE_LISTED = process.env.NEXT_PUBLIC_PLAY_STORE_LISTED?.trim() === "true";
+
 // Razorpay expects a public page carrying the merchant's registered identity,
 // and /contact exists to be that page. But the identity must not be guessed
 // ahead of the KYC submission: a /contact stating an address that is not the

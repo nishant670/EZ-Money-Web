@@ -7,10 +7,10 @@ import { ChevronDown, LayoutDashboard, LogOut, Menu, X } from "lucide-react";
 import { AuthProvider, useAuth } from "@/app/context/AuthContext";
 
 const navigation = [
-    { href: "#features", label: "Features" },
     { href: "#how-it-works", label: "How it works" },
+    { href: "#features", label: "Features" },
     { href: "#security", label: "Security" },
-    { href: "#availability", label: "Availability" },
+    { href: "#pricing", label: "Pricing" },
     { href: "/tools", label: "Free Tools" },
 ];
 
