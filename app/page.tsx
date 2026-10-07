@@ -22,9 +22,9 @@ import { discountPercent, formatMinor } from "@/app/lib/billing-format";
 import { fetchPublishedPrices, intervalDuration } from "@/app/lib/public-plans";
 
 const faqs = [
-  { q: "Do I need to connect my bank?", a: "No. Finnri does not connect to banks or automatically import bank activity. You record transactions yourself by voice, text, or manual entry and maintain your own account labels and balances." },
-  { q: "How does voice input work?", a: "In the mobile app, tap the microphone and speak naturally. Finnri sends the audio for transcription, creates an editable draft, and waits for your confirmation before saving a transaction." },
-  { q: "What happens to voice and text drafts?", a: "Voice audio is held only long enough to transcribe it. Parse attempts, raw provider prompts, and raw provider responses are not persisted. A confirmed transaction may retain its source text as editable provenance." },
+  { q: "Do I need to connect my bank?", a: "No. Finnri never connects to your bank. You add transactions yourself — by voice, text or tap — so you decide exactly what’s tracked." },
+  { q: "How does voice input work?", a: "In the app, tap the mic and say it the way you’d tell a friend — “250 for lunch on UPI”. Finnri turns it into a draft and waits for you to check it before anything is saved." },
+  { q: "What happens to voice and text drafts?", a: "Your voice is kept only long enough to turn it into text. Drafts you don’t save aren’t stored. When you do save a transaction, the words you used can stay with it, so you can always see where it came from." },
   { q: "Can I export my data?", a: "Yes. Export any transaction view from the web dashboard as a CSV file, on the free plan or a paid pass." },
   { q: "Is Finnri free?", a: "Yes. Tracking, accounts, search, splits with friends and CSV export are free. Signing in with Google adds 1,000 AI credits to use over your first 30 days. Paid passes add more AI credits plus budgets, insights and subscription reminders." },
   { q: "Do paid passes renew automatically?", a: "No. Every pass is a one-time payment for a fixed period: 7, 30, 90 or 365 days. Nothing is debited again unless you choose to buy another pass." },
@@ -102,7 +102,7 @@ export default async function Home() {
             <div className="max-w-2xl relative z-10">
               <div className="inline-flex items-center gap-2 bg-accent-secondary text-accent px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
                 <Brain className="w-4 h-4" />
-                <span>Confirm-first AI Intelligence</span>
+                <span>AI that asks before it saves</span>
               </div>
               {/* text-6xl, not 7xl: at 72px this headline needs three lines in a
                   half-width column and strands "clarity." alone on the last one.
@@ -111,7 +111,7 @@ export default async function Home() {
                 Track your money in India <span className="text-accent underline decoration-accent/20 underline-offset-8">with clarity.</span>
               </h1>
               <p className="text-xl text-text-muted mb-10 leading-relaxed max-w-lg">
-                Record expenses and income by voice, text, or manual entry. Finnri can suggest the details; you review every record before it is saved.
+                Log what you spend by voice, text or tap. Finnri fills in the details, and nothing is saved until you’ve had a look.
               </p>
 
               {/* Three full-width buttons do not fit one row in a half-width
@@ -132,12 +132,12 @@ export default async function Home() {
                   ? "group flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-border bg-white px-6 py-4 font-bold shadow-md transition-all hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700"
                   : "group flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-zinc-950 px-6 py-4 font-bold text-white shadow-xl shadow-zinc-950/10 transition-all hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"}>
                   <LayoutDashboard className="w-5 h-5 text-accent" />
-                  Open Web Dashboard
+                  Open the web dashboard
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <Link href="/tools" className="flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-border bg-white px-6 py-4 font-bold shadow-md transition-all hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700">
                   <TrendingUp className="w-5 h-5 text-accent" />
-                  Explore Free Tools
+                  Try the free tools
                 </Link>
               </div>
 
@@ -188,8 +188,8 @@ export default async function Home() {
       <section id="how-it-works" className="py-24 bg-accent-secondary/30">
         <div className="container mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">Effortless Tracking in 3 Steps</h2>
-            <p className="text-text-muted">Choose the capture method that suits the moment, then confirm the record before it reaches your ledger.</p>
+            <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">Log a spend in three steps</h2>
+            <p className="text-text-muted">Say it, type it or tap it in — then check it before it’s saved.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -229,40 +229,40 @@ export default async function Home() {
       <section id="features" className="py-24">
         <div className="container mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">Powerful Features, Zero Clutter</h2>
-            <p className="text-text-muted">Practical tools for recording day-to-day money and understanding confirmed transactions.</p>
+            <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-rounded">Everything you need, nothing you don’t</h2>
+            <p className="text-text-muted">Simple tools for everyday money, and a clear view of where it goes.</p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
                 icon: <Mic className="w-6 h-6" />,
-                title: "Voice-first Tracking",
+                title: "Voice-first tracking",
                 desc: "Use mobile voice capture when it is convenient, with a review step before saving."
               },
               {
                 icon: <PieChart className="w-6 h-6" />,
-                title: "Smart Categorization",
+                title: "Smart categories",
                 desc: "AI suggests a category from Finnri's shared list; you can correct it before saving."
               },
               {
                 icon: <Wallet className="w-6 h-6" />,
-                title: "Multi-Account Tracking",
+                title: "All your accounts",
                 desc: "Label cash, bank, wallet, UPI, and card accounts you maintain yourself. Finnri does not connect to banks."
               },
               {
                 icon: <TrendingUp className="w-6 h-6" />,
-                title: "Budgets & Insights",
+                title: "Budgets & insights",
                 desc: "Set category budgets and see trends and unusual spending, calculated from the transactions you have confirmed."
               },
               {
                 icon: <Users className="w-6 h-6" />,
-                title: "Split with Friends",
+                title: "Split with friends",
                 desc: "Share trips, flatmates and dinners in a group, see who owes whom, and settle up. Invite anyone with a link."
               },
               {
                 icon: <LayoutDashboard className="w-6 h-6" />,
-                title: "Web Dashboard",
+                title: "Web dashboard",
                 desc: "Review explainable insights, accounts, transactions, and planning tools on the big screen."
               }
             ].map((feature, i) => (
@@ -327,7 +327,7 @@ export default async function Home() {
               </div>
               <div className="mt-8 relative z-10">
                 <p className="text-2xl font-bold mb-2">Detailed insights at your fingertips.</p>
-                <p className="text-zinc-300">See category and merchant totals calculated from your confirmed records.</p>
+                <p className="text-zinc-300">See what you spend by category and by shop — from the transactions you’ve checked.</p>
               </div>
               {/* Decorative dots */}
               {[...Array(20)].map((_, i) => (
@@ -349,7 +349,7 @@ export default async function Home() {
               <div>
                 <h2 className="text-3xl lg:text-4xl font-bold mb-6 font-rounded">Analyze on the big screen.</h2>
                 <p className="text-text-muted text-lg mb-8 leading-relaxed">
-                  Some things are better seen on a larger canvas. Use the Web Dashboard to understand patterns, review records, and plan with context.
+                  Some things are easier on a big screen. Spot patterns, tidy up records and plan ahead on the web dashboard.
                 </p>
                 <ul className="space-y-4 mb-10 text-lg font-medium">
                   <li className="flex items-center gap-3">
@@ -366,7 +366,7 @@ export default async function Home() {
                   </li>
                 </ul>
                 <Link href="/tools" className="inline-flex items-center gap-2 bg-accent px-8 py-4 rounded-2xl font-bold text-zinc-950 shadow-lg shadow-accent/20 hover:scale-105 transition-transform">
-                  Use Free Tools
+                  Try the free tools
                   <ArrowRight className="w-5 h-5" />
                 </Link>
               </div>
@@ -519,7 +519,7 @@ export default async function Home() {
       {/* FAQ Section */}
       <section className="py-24">
         <div className="container mx-auto px-6 max-w-3xl">
-          <h2 className="text-3xl lg:text-4xl font-bold text-center mb-12 font-rounded">Frequently Asked Questions</h2>
+          <h2 className="text-3xl lg:text-4xl font-bold text-center mb-12 font-rounded">Questions, answered</h2>
           <div className="space-y-4">
             {faqs.map((faq) => (
               <details key={faq.q} className="group border border-border rounded-2xl bg-white p-6 dark:bg-zinc-800">
@@ -541,16 +541,16 @@ export default async function Home() {
 
             <div className="relative z-10">
               <h2 className="text-4xl lg:text-6xl font-bold mb-8 font-rounded leading-tight">Start with Finnri on the web.</h2>
-              <p className="text-zinc-800 text-xl mb-12 max-w-2xl mx-auto">Create an account or continue as a guest to record transactions and explore the dashboard.</p>
+              <p className="text-zinc-800 text-xl mb-12 max-w-2xl mx-auto">Sign in, or try it as a guest — no sign-up needed.</p>
 
               <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
                 <Link href="/login" className="flex items-center gap-3 bg-white px-10 py-5 rounded-2xl font-bold text-zinc-950 shadow-xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
                   <LayoutDashboard className="w-6 h-6" />
-                  Open Web Dashboard
+                  Open the web dashboard
                 </Link>
                 <Link href="/tools" className="flex items-center gap-3 bg-zinc-900 text-white px-10 py-5 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
                   <TrendingUp className="w-6 h-6" />
-                  Use Free Tools
+                  Try the free tools
                 </Link>
               </div>
             </div>

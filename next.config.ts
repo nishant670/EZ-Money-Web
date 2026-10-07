@@ -40,7 +40,10 @@ const contentSecurityPolicy = [
     // bundle from cdn.razorpay.com. Blocking that second script does not raise a
     // visible error on the pay page — it degrades the fraud signal Razorpay scores
     // the transaction with, so the failure arrives later as a decline.
-    `script-src 'self' 'unsafe-inline' ${analyticsOrigins.script} https://accounts.google.com https://checkout.razorpay.com https://cdn.razorpay.com`,
+    // `next dev` evaluates its modules and React Refresh runtime as strings, so
+    // without 'unsafe-eval' the dev server renders a page whose script never
+    // runs. Development only — a production build needs no eval.
+    `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"} ${analyticsOrigins.script} https://accounts.google.com https://checkout.razorpay.com https://cdn.razorpay.com`,
     "style-src 'self' 'unsafe-inline' https://accounts.google.com https://*.razorpay.com",
     // Razorpay renders bank, card-network and UPI-app artwork from its CDN, and
     // the checkout sheet draws part of itself in this document rather than only
