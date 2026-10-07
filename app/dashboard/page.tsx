@@ -49,7 +49,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         <div className="rounded-panel border border-dashed border-accent/30 bg-gradient-to-br from-white to-accent/5 p-10 text-center dark:from-zinc-900 dark:to-accent/5">
             <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent/10 text-accent"><Sparkles className="h-6 w-6" /></span>
             <h2 className="mt-5 text-xl font-bold font-rounded">Your first insight starts with one transaction</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">Add an expense or income. Finnri will turn it into category, account, merchant, and period-level insight automatically.</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">Log one expense or income and Finnri starts showing you where your money goes.</p>
             <button onClick={onAdd} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-zinc-950 shadow-lg shadow-accent/20"><Plus className="h-4 w-4" /> Add a transaction</button>
         </div>
     );
@@ -83,7 +83,7 @@ export default function DashboardHome() {
             const response = await DashboardAPI.get(rangeFor(preset));
             setDashboard(response.data);
         } catch (requestError) {
-            setError(apiErrorMessage(requestError, "We couldn’t load your dashboard. Check that the FINNRI API is running, then try again."));
+            setError(apiErrorMessage(requestError, "We couldn’t load your dashboard. Check your connection and try again."));
         } finally {
             if (background) setRefreshing(false);
             else setLoading(false);
@@ -122,7 +122,7 @@ export default function DashboardHome() {
                             <h1 className="text-3xl font-bold tracking-tight font-rounded sm:text-4xl">Overview</h1>
                             <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-zinc-500 shadow-sm ring-1 ring-border dark:bg-zinc-900"><CalendarDays className="h-3.5 w-3.5 text-accent" /> {dashboard ? formatDateRange(dashboard.period.start, dashboard.period.end) : "Your money, in context"}</span>
                         </div>
-                        <p className="mt-2 text-sm text-zinc-500">Your fast current-state briefing: totals, guardrails, attention, and latest activity.</p>
+                        <p className="mt-2 text-sm text-zinc-500">Where the month stands, what needs a look, and what you spent most recently.</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <button onClick={() => void exportPeriod()} disabled={!dashboard || isExporting} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-bold text-zinc-600 disabled:opacity-40 dark:bg-zinc-900 dark:text-zinc-300"><Download className="h-4 w-4" />{isExporting ? "Exporting…" : "Export period"}</button>
@@ -166,11 +166,11 @@ export default function DashboardHome() {
 
                         {dashboard.review_items.length > 0 && (
                             <section id="review-queue" className="rounded-panel border border-amber-200 bg-amber-50/60 p-6 dark:border-amber-900/50 dark:bg-amber-950/20 sm:p-8" aria-labelledby="review-queue-heading">
-                                <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Needs correction</p><h2 id="review-queue-heading" className="mt-2 text-xl font-bold font-rounded">Review {dashboard.review_items.length} transaction{dashboard.review_items.length === 1 ? "" : "s"}</h2><p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">These records are missing a category or linked account. Open one to correct it; it leaves this queue after the required field is saved.</p></div>
+                                <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Needs a quick fix</p><h2 id="review-queue-heading" className="mt-2 text-xl font-bold font-rounded">Review {dashboard.review_items.length} transaction{dashboard.review_items.length === 1 ? "" : "s"}</h2><p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">These are missing a category or an account. Fix one and it drops off this list.</p></div>
                                 <div className="mt-5 grid gap-3 lg:grid-cols-2">{dashboard.review_items.map((item) => (
                                     <button key={item.id} onClick={() => setSelectedTransaction(item)} className="flex items-center gap-4 rounded-2xl border border-amber-200 bg-white p-4 text-left hover:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-200/50 dark:border-amber-900/50 dark:bg-zinc-900">
                                         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-sm font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">!</span>
-                                        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{item.merchant || item.title}</span><span className="mt-1 block text-xs text-zinc-500">{!item.category || item.category.toLowerCase() === "uncategorized" ? "Category required" : "Linked account required"}{item.category_suggestions?.length ? ` · Suggested: ${item.category_suggestions.join(", ")}` : ""}</span></span>
+                                        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{item.merchant || item.title}</span><span className="mt-1 block text-xs text-zinc-500">{!item.category || item.category.toLowerCase() === "uncategorized" ? "Needs a category" : "Needs an account"}{item.category_suggestions?.length ? ` · Suggested: ${item.category_suggestions.join(", ")}` : ""}</span></span>
                                         <span className="text-xs font-bold text-amber-700 dark:text-amber-300">Correct</span>
                                     </button>
                                 ))}</div>
@@ -180,7 +180,7 @@ export default function DashboardHome() {
                         {dashboard.budget_statuses.length > 0 && (
                             <section aria-labelledby="budget-progress-heading" className="rounded-panel border border-border bg-zinc-100/70 p-6 dark:bg-zinc-950 sm:p-8">
                                 <div className="flex items-end justify-between gap-4">
-                                    <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">Monthly guardrails</p><h2 id="budget-progress-heading" className="mt-2 text-xl font-bold font-rounded">Budget progress</h2></div>
+                                    <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">Monthly limits</p><h2 id="budget-progress-heading" className="mt-2 text-xl font-bold font-rounded">Budget progress</h2></div>
                                     <Link href="/dashboard/tools#budgets" className="inline-flex items-center gap-1 text-xs font-bold text-accent">Manage budgets <ArrowUpRight className="h-4 w-4" /></Link>
                                 </div>
                                 <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">{dashboard.budget_statuses.slice(0, 3).map((budget) => <BudgetProgressCard key={budget.budget_id} budget={budget} compact />)}</div>
@@ -198,7 +198,7 @@ export default function DashboardHome() {
                                         data={dailyChartData}
                                         onSelectDate={(date) => router.push(transactionHref({ type: "expense", start_date: date, end_date: date }))}
                                     />
-                                ) : <div className="grid h-full place-items-center rounded-2xl bg-zinc-50 text-sm font-semibold text-zinc-400 dark:bg-zinc-800">Daily spending appears after confirmed expenses.</div>}
+                                ) : <div className="grid h-full place-items-center rounded-2xl bg-zinc-50 text-sm font-semibold text-zinc-400 dark:bg-zinc-800">Your daily spending shows up here once you log an expense.</div>}
                             </div>
                             <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                 {dailyChartData.filter((item) => item.count > 0).slice(-8).map((day) => (
@@ -208,7 +208,7 @@ export default function DashboardHome() {
                                     </Link>
                                 ))}
                             </div>
-                            <p className="mt-3 text-xs text-zinc-400">Hover for detail, or select a bar/day to inspect the purchases.</p>
+                            <p className="mt-3 text-xs text-zinc-400">Hover a day for the total, or click it to see what you bought.</p>
                         </section>
 
                         <section className="rounded-panel border border-border bg-white p-6 dark:bg-zinc-900 sm:p-8">
