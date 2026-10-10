@@ -34,6 +34,8 @@
     "app/lib/split-invite.ts",
     "app/lib/split-invite.test.ts",
     "app/lib/form-summaries.ts",
-    "app/lib/form-summaries.test.ts"
+    "app/lib/form-summaries.test.ts",
+    "app/lib/feedback-attachments.ts",
+    "app/lib/feedback-attachments.test.ts"
   ]
 }
