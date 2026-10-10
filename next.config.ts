@@ -66,11 +66,18 @@ const securityHeaders = [
     { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(), payment=(self \"https://checkout.razorpay.com\")" },
 ];
 
+// Every Vercel deployment that is not production — staging.finnri.app and each
+// per-branch preview — is a full copy of the site, and search engines must not
+// list it beside the real one. A header rather than a robots.txt rule: a
+// crawler has to be allowed to fetch a page to learn it may not index it.
+const searchHeaders =
+    process.env.VERCEL_ENV === "preview" ? [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] : [];
+
 const nextConfig: NextConfig = {
     poweredByHeader: false,
     productionBrowserSourceMaps: false,
     async headers() {
-        return [{ source: "/:path*", headers: securityHeaders }];
+        return [{ source: "/:path*", headers: [...securityHeaders, ...searchHeaders] }];
     },
     async rewrites() {
         return [
